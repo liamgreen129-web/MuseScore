@@ -100,6 +100,8 @@ if (MUE_BUILD_APPSHELL_MODULE)
     endif()
 endif()
 
+add_subdirectory(agent) # AGENT: MuseScore Agent module
+
 # App (main)
 add_subdirectory(app)
 if (MUE_CONFIGURATION_IS_APPWEB)

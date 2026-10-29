@@ -149,6 +149,7 @@ add_to_link_if_exists(muse::update)
 add_to_link_if_exists(muse::vst)
 add_to_link_if_exists(muse::workspace)
 
+add_to_link_if_exists(agent) # AGENT: MuseScore Agent module
 add_to_link_if_exists(appshell)
 add_to_link_if_exists(braille)
 add_to_link_if_exists(context)

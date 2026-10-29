@@ -140,6 +140,7 @@
 #endif
 
 // Modules
+#include "agent/agentmodule.h" // AGENT: MuseScore Agent module
 #include "appshell/appshellmodule.h"
 
 #ifdef MUSE_MODULE_AUTOBOT
@@ -344,6 +345,7 @@ std::shared_ptr<muse::IApplication> AppFactory::newGuiApp(const CmdOptions& opti
     app->addModule(new muse::media::MediaModule());
 
 // modules
+    app->addModule(new mu::agent::AgentModule()); // AGENT: MuseScore Agent module
 #ifdef MUE_BUILD_APPSHELL_MODULE
     app->addModule(new mu::appshell::AppShellModule());
 #endif

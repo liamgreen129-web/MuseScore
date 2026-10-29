@@ -85,3 +85,18 @@
 - 2026-10-29 · agent/4.7 pushed to origin (github.com/liamgreen129-web/MuseScore) · needed for the move to the Mac mini; gh login now has the `workflow` scope.
 - 2026-10-29 · G0 manual checks run by the conductor (see G0-checklist.md): separate processes, official quit leaves agent running, second score opens in an agent process, official settings untouched by the agent. Open: agent-quit-with-official-open (blocked by first-launch dialogs), and Muse Sounds.
 - 2026-10-29 · **Correction to PHASE0 §1 / earlier preflight line: Muse Sounds is not installed for MuseScore 4.7 on the MacBook Pro.** 4.7 looks only in `~/Library/Application Support/MuseSampler/lib/` (musesamplerconfiguration.cpp:55, override `MUSESAMPLER_PATH`), which is empty; `/usr/local/lib/libMuseSamplerCoreLib.dylib` (2024) is a leftover the official app doesn't use either. The G0 Muse Sounds check is "same as official" here; the real test moves to the Mac mini.
+
+## Gate G0 (2026-10-29)
+
+- 2026-10-29 · **G0 signed off by Liam** ("G0 passes") · on the MacBook Pro; reverse-quit check and Muse Sounds playback deferred (Muse Sounds not installed for 4.7 here). Re-run the G0 list on the Mac mini after its first build.
+
+## P1.1 MCP server port (2026-10-29)
+
+- 2026-10-29 · Ported muse_framework `rcontrol` @ ecdc6e7 (mcpserver, httptransport, itransport, mcptypes; ~800 lines) into `src/agent/server/`, namespace `mu::agent::mcp`. Upstream's module, controller, TCP transport and stdio bridge were not ported (not needed; the bridge stays upstream's if the desktop app needs stdio).
+- 2026-10-29 · Changes from upstream, each marked `AGENT` in the source: bearer token on every POST (constant-time compare, 401 + `WWW-Authenticate: Bearer`); `Host` header must be loopback (DNS-rebinding defence); port range 2412–2431, first free (one server per process/score); server name `MuseScoreAgent`, version `4.7.6-agent+<rev>`; MCP `ping`; JSON parse errors → -32700, missing tool name → -32602; schemas gain `required`, `enum`, `items`; request bodies and headers are never logged.
+- 2026-10-29 · 4.7.6's JSON lacks MuseScore 5's implicit JsonArray/JsonObject → JsonValue conversion; the port assigns instead. No other API gaps.
+- 2026-10-29 · Token: one per user at `~/Library/Application Support/MuseScore/MuseScoreAgent/agent/token` (64 hex chars from QRandomGenerator::system(), file 0600, folder 0700), shared by every instance so one Claude Code config reaches any window.
+- 2026-10-29 · Kill switch for now: `MUSESCORE_AGENT_DISABLE=1`; the Preferences switch is P4.1.
+- 2026-10-29 · Upstream footprint: three tagged lines (src/CMakeLists.txt, src/app/CMakeLists.txt, src/app/appfactory.cpp include + addModule). GUI app only; console/converter runs don't start the server.
+- 2026-10-29 · **Qt `offscreen` and `minimal` platforms crash MuseScore 4.7.6 during GUI setup (SIGSEGV after "New context created"), with or without the agent module, with Metal, OpenGL or software Quick backends.** Tests therefore launch the normal GUI in the background (`open -n -g`). P2.2's scenario driver must solve headless running or accept background windows.
+- 2026-10-29 · `tests/agent/test_server.py`: 29 checks, all PASS on build 6d6e0c7+P1.1.

@@ -77,6 +77,7 @@ scripts/build.sh            # wraps ninja_build.sh with the agreed options
 scripts/check-identity.sh   # verifies the separate-app identity in the built bundle
 scripts/install.sh          # copies to /Applications/MuseScore Agent.app, ad-hoc signs
 scripts/sync-upstream.sh    # fetch next 4.7.x tag, rebase agent/4.7, rebuild, test
+python3 -I tests/agent/test_server.py   # P1.1 server checks (opens the build in the background)
 ```
 
 ## Key source locations (v4.7.6)
