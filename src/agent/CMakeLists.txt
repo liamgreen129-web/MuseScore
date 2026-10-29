@@ -65,6 +65,16 @@ target_sources(agent_notes PRIVATE
 target_include_directories(agent_notes PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(agent_notes PUBLIC agent_address agent_core agent_read agent_notation engraving)
 
+# Slurs and lines (P2.4 expression-lines): add_slur/add_line handlers, engraving-level and
+# unit-tested without the app.
+muse_create_module(agent_lines NO_UNITY)
+target_sources(agent_lines PRIVATE
+    commands/expression-lines/lineops.cpp
+    commands/expression-lines/lineops.h
+)
+target_include_directories(agent_lines PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(agent_lines PUBLIC agent_core agent_read engraving)
+
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 
 target_sources(agent PRIVATE
@@ -89,7 +99,6 @@ target_sources(agent PRIVATE
     commands/notes/notescommands.cpp
     commands/notes/notescommands.h
     commands/expression-lines/expressionlines.h
-    commands/expression-lines/lineops.cpp
     commands/expression-lines/register.cpp
     commands/read/readcommands.cpp
     commands/read/exportcommands.cpp
@@ -116,7 +125,7 @@ target_sources(agent PRIVATE
     server/tokenstore.h
 )
 
-target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes)
+target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes agent_lines)
 
 target_compile_definitions(agent PRIVATE AGENT_BUNDLE_ID="${MUSE_APP_GUI_IDENTIFIER}")
 

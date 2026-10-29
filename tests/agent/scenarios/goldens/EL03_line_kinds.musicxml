@@ -285,11 +285,6 @@
         <type>half</type>
         <stem>down</stem>
         </note>
-      <direction placement="above">
-        <direction-type>
-          <bracket type="stop" number="1" line-end="down" end-length="15"/>
-          </direction-type>
-        </direction>
       <note default-x="80" default-y="-25">
         <pitch>
           <step>A</step>
@@ -312,6 +307,11 @@
         <type>half</type>
         <stem>down</stem>
         </note>
+      <direction placement="above">
+        <direction-type>
+          <bracket type="stop" number="1" line-end="down" end-length="15"/>
+          </direction-type>
+        </direction>
       </measure>
     </part>
   </score-partwise>

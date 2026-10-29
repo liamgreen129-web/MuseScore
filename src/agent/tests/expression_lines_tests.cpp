@@ -29,9 +29,13 @@
 
 #include "engraving/dom/chord.h"
 #include "engraving/dom/excerpt.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/part.h"
+#include "engraving/dom/staff.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/mscore.h"
+#include "engraving/dom/note.h"
 #include "engraving/dom/ottava.h"
 #include "engraving/dom/pedal.h"
 #include "engraving/dom/segment.h"
@@ -48,14 +52,15 @@
 #include "core/undobackend.h"
 #include "registry/errors.h"
 
-// The group's handlers are engraving-only; they are compiled into this test directly (the test
-// target links the engraving and agent core libraries, not the app-side agent module).
-#include "commands/expression-lines/lineops.cpp"
+#include "commands/expression-lines/lineops.h"
+#include "notation/writer.h"
+#include "read/scoreprinter.h"
 
 using namespace mu::agent;
 using namespace mu::agent::core;
 using namespace mu::engraving;
 using muse::Ret;
+using muse::RetVal;
 using muse::Val;
 using muse::ValList;
 using muse::ValMap;
@@ -185,12 +190,27 @@ protected:
         MScore::setError(MsError::MS_NO_ERROR);
     }
 
+    //! Everything a failed request must leave alone: the whole score printed in the notation,
+    //! and every spanner of the master and of each part
+    std::string snapshot()
+    {
+        std::string s = mu::agent::notation::write(read::printScore(score.get()));
+        for (Score* sc : score->scoreList()) {
+            s += "\nspanners " + std::to_string(sc->spanner().size());
+            for (const auto& [tick, sp] : sc->spanner()) {
+                s += " " + std::string(sp->typeName()) + "@" + std::to_string(tick) + "-" + std::to_string(sp->tick2().ticks());
+            }
+        }
+        return s;
+    }
+
     //! One request: a transaction around the op, as runWrite does. A failed op must leave the
-    //! undo stack where it was.
+    //! undo stack where it was and the score unchanged.
     Outcome run(const Op& op, const Params& p)
     {
         Outcome o;
         const size_t before = backend->currentIndex();
+        const std::string state = snapshot();
         Transaction tx(score.get(), *backend);
         o.ret = tx.begin("Agent: test");
         if (!o.ret) {
@@ -200,6 +220,7 @@ protected:
         if (!o.ret) {
             EXPECT_EQ(backend->currentIndex(), before) << "a failed op left an undo entry";
             EXPECT_FALSE(score->undoStack()->isLocked());
+            EXPECT_EQ(snapshot(), state) << "a failed op changed the score: " << o.ret.text();
             return o;
         }
         o.ret = tx.commit();
@@ -435,10 +456,7 @@ TEST_F(Agent_ExpressionLines, PedalOverTwoBarsThenUndoRedo)
     EXPECT_EQ(sp->track(), 4u);
     EXPECT_EQ(toPedal(sp)->endHookType(), HookType::HOOK_90);
     EXPECT_TRUE(contains(o.str("bars"), "m9 v1 | D3:h+ped[ F3:h")) << o.str("bars");
-    // The end mark's place is not checked in the printed bars: MuseScore's pedal end element is the
-    // event at tick2 (the one after the last covered event), and the read printer puts "ped]" there
-    // (reported to the conductor; scoreprinter.cpp is not this group's), here m11, outside the
-    // returned bars. tick2 is checked above.
+    EXPECT_TRUE(contains(o.str("bars"), "m10 v1 | E3:h C3:h+ped]")) << o.str("bars");
     EXPECT_EQ(o.str("kind"), "pedal");
     undo();
     EXPECT_EQ(countSpanners(score.get(), ElementType::PEDAL), pedals);
@@ -456,9 +474,7 @@ TEST_F(Agent_ExpressionLines, PedalAsteriskStyle)
     const Pedal* pedal = toPedal(resolveHandle(score.get(), o.str("handle")).val);
     EXPECT_FALSE(pedal->lineVisible());
     EXPECT_EQ(pedal->endHookType(), HookType::ROSETTE);
-    EXPECT_TRUE(contains(o.str("bars"), "m11 v1 | F3:h+ped")) << o.str("bars");
-    EXPECT_TRUE(contains(o.str("bars"), "+ped[")) << o.str("bars");
-    EXPECT_TRUE(contains(o.str("bars"), "+ped]")) << o.str("bars");
+    EXPECT_TRUE(contains(o.str("bars"), "m11 v1 | F3:h+ped[+ped] D3:h")) << o.str("bars"); // one event: both marks
     EXPECT_EQ(pedal->tick2() - pedal->tick(), Fraction(1, 2));
 }
 
@@ -480,7 +496,8 @@ TEST_F(Agent_ExpressionLines, OttavaTypesAndPlacement)
     const Ottava* o = toOttava(resolveHandle(score.get(), b.str("handle")).val);
     EXPECT_EQ(o->ottavaType(), OttavaType::OTTAVA_15MB);
     EXPECT_EQ(o->placement(), PlacementV::ABOVE);
-    EXPECT_TRUE(contains(b.str("bars"), "+15mb[")) << b.str("bars");
+    EXPECT_TRUE(contains(b.str("bars"), "m2 v1 | (G4:q+< A2:q+15mb[")) << b.str("bars");
+    EXPECT_TRUE(contains(b.str("bars"), "m3 v1 | A2:q+15mb]")) << b.str("bars"); // A4 sounding two octaves down
     undo();
     undo();
     EXPECT_EQ(countSpanners(score.get(), ElementType::OTTAVA), 1u); // the fixture's own
@@ -503,7 +520,7 @@ TEST_F(Agent_ExpressionLines, TrillInLinkedPartsHasOrnament)
             }
         }
     }
-    EXPECT_TRUE(contains(o.str("bars"), "+trl[")) << o.str("bars");
+    EXPECT_TRUE(contains(o.str("bars"), "m3 v1 | D5:h+trl[+trl] C5:h")) << o.str("bars");
     undo();
     EXPECT_EQ(countAll(score.get(), ElementType::TRILL), trills);
     redo();
@@ -567,7 +584,8 @@ TEST_F(Agent_ExpressionLines, StaffAndSystemTextLines)
     EXPECT_EQ(t->endHookType(), HookType::HOOK_90);
     EXPECT_EQ(t->track(), 8u);
     EXPECT_EQ(countAll(score.get(), ElementType::TEXTLINE), lines0 + 1); // the bassoon has no part
-    EXPECT_TRUE(contains(a.str("bars"), "+txt[\"rit.\"")) << a.str("bars");
+    EXPECT_TRUE(contains(a.str("bars"), "m2 v1 | G2:h+txt[\"rit.\" C3:h")) << a.str("bars");
+    EXPECT_TRUE(contains(a.str("bars"), "m3 v1 | B2:h A2:h+txt]")) << a.str("bars");
 
     p = lineArgs("textLine", partPos(1, 1, "Bassoon"), partPos(1, 1, "Bassoon"));
     p["text"] = Val("a <b> & c");
@@ -631,7 +649,7 @@ TEST_F(Agent_ExpressionLines, LineErrors)
         p["endings"] = Val(ValList { Val(1.0), Val(1.0) });
         expectErr(line(p), AErr::InvalidArg, "twice");
         p["endings"] = Val(ValList { Val(0.0) });
-        expectErr(line(p), AErr::InvalidArg, "from 1");
+        expectErr(line(p), AErr::InvalidArg, "1-100");
     }
     EXPECT_EQ(score->spanner().size(), total);
 }
@@ -674,5 +692,158 @@ TEST_F(Agent_ExpressionLines, BatchIsAllOrNothing)
     EXPECT_EQ(backend->currentIndex(), before + 1);
     undo();
     EXPECT_EQ(score->spanner().size(), total);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Every remaining validation path: the code, and nothing changed (run() compares the whole score
+// printed, every spanner of the master and its parts, and the undo index)
+// ---------------------------------------------------------------------------------------------
+
+TEST_F(Agent_ExpressionLines, SlurEndsAtTheSameTimeAreRefused)
+{
+    open("voices-four.mscz");
+    expectErr(slur(slurArgs(pos(1, 1, 1, 1), pos(1, 1, 1, 2))), AErr::InvalidArg, "same time");
+}
+
+TEST_F(Agent_ExpressionLines, SlurOnTwoLinkedStavesOfOnePartIsRefused)
+{
+    open("pickup-bar.mscz");
+    // add a staff linked to the flute's, as "Add linked staff" does (links_tests.cpp:104-109)
+    score->startCmd(muse::TranslatableString::untranslatable("test: linked staff"));
+    Staff* original = score->staff(0);
+    Staff* linked = Factory::createStaff(original->part());
+    linked->setPart(original->part());
+    score->undoInsertStaff(linked, 1, false);
+    Excerpt::cloneStaff(original, linked);
+    score->endCmd();
+    ASSERT_EQ(score->nstaves(), 2u);
+    ASSERT_TRUE(score->staff(1)->isLinked(score->staff(0)));
+    expectErr(slur(slurArgs(pos(2, 1, 1), pos(2, 3, 2))), AErr::InvalidArg, "linked staves");
+}
+
+TEST_F(Agent_ExpressionLines, SlurOnTrillCueNoteIsRefused)
+{
+    open("parts-linked.mscz");
+    ChordRest* cr = crAt(score.get(), 1, 0, 1);
+    ASSERT_TRUE(cr && cr->isChord());
+    toChord(cr)->setIsTrillCueNote(true); // test set-up only
+    expectErr(slur(slurArgs(pos(1, 1, 1), pos(1, 2, 1))), AErr::InvalidArg, "trill cue");
+    expectErr(slur(slurArgs(pos(1, 2, 1), pos(1, 1, 1))), AErr::InvalidArg, "trill cue");
+}
+
+TEST_F(Agent_ExpressionLines, AmbiguousPartNameIsRefused)
+{
+    open("parts-linked.mscz");
+    score->parts().at(1)->setPartName(u"Flute"); // test set-up only: two parts named "Flute"
+    expectErr(slur(slurArgs(partPos(1, 2, "Flute"), partPos(1, 3, "Flute"))), AErr::InvalidArg, "2 parts are named");
+}
+
+TEST_F(Agent_ExpressionLines, MalformedAddressesAreRefused)
+{
+    open("parts-linked.mscz");
+    const Val ok = pos(1, 3, 1);
+    {
+        ValMap staff;
+        staff["part"] = Val("Flute");
+        staff["number"] = Val(1.0);
+        expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "unknown key 'number'");
+        staff.erase("number");
+        staff["index"] = Val(1.5);
+        expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "index must be a whole number");
+        staff.erase("index");
+        staff["part"] = Val(2.0);
+        expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "staff.part");
+    }
+    expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(1.5)), ok)), AErr::InvalidArg, "whole staff number");
+    expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(true)), ok)), AErr::InvalidArg, "staff must be");
+    expectErr(slur(slurArgs(with(pos(1, 2, 1), "beat", Val("two")), ok)), AErr::InvalidArg, "beat must be a number");
+    {
+        ValMap m = pos(1, 2, 1).toMap();
+        m.erase("beat");
+        m["tick"] = Val(480.5);
+        expectErr(slur(slurArgs(Val(m), ok)), AErr::InvalidArg, "tick must be a whole number");
+        m["tick"] = Val(480.0); // the same place as beat 2: accepted
+        ASSERT_TRUE(slur(slurArgs(Val(m), ok)).ret);
+    }
+    expectErr(slur(slurArgs(with(pos(1, 2, 1), "measure", Val(1.5)), ok)), AErr::InvalidArg, "measure is required");
+    expectErr(slur(slurArgs(with(pos(1, 2, 1), "grace", Val(0.0)), ok)), AErr::InvalidArg, "grace must be a whole number");
+    expectErr(slur(slurArgs(with(pos(1, 1, 2), "grace", Val(1.0)), pos(1, 2, 2))), AErr::InvalidArg, "no grace notes");
+    expectErr(slur(slurArgs(handleAddr("x"), ok)), AErr::InvalidArg, "malformed handle");
+    {
+        ValMap m;
+        m["handle"] = Val(3.0);
+        expectErr(slur(slurArgs(Val(m), ok)), AErr::InvalidArg, "handle must be a string");
+    }
+}
+
+TEST_F(Agent_ExpressionLines, MalformedVoltaAddressesAreRefused)
+{
+    open("parts-linked.mscz");
+    auto volta = [&](Val start, Val end) { return line(lineArgs("volta", start, end)); };
+    expectErr(volta(Val("m1"), bar(2)), AErr::InvalidArg, "must be an object");
+    expectErr(volta(bar(1), Val(2.0)), AErr::InvalidArg, "must be an object");
+    expectErr(volta(with(bar(1), "bar", Val(2.0)), bar(2)), AErr::InvalidArg, "unknown key 'bar'");
+    expectErr(volta(Val(ValMap {}), bar(2)), AErr::InvalidArg, "measure is required");
+    expectErr(volta(with(bar(1), "staff", Val(2.0)), bar(2)), AErr::InvalidArg, "no staff");
+    expectErr(volta(bar(1), with(bar(2), "voice", Val(1.0))), AErr::InvalidArg, "no voice");
+    expectErr(volta(with(bar(1), "tick", Val(0.0)), bar(2)), AErr::InvalidArg, "whole bars");
+    expectErr(volta(with(bar(1), "grace", Val(1.0)), bar(2)), AErr::InvalidArg, "whole bars");
+    expectErr(volta(handleAddr("Chord:bad"), bar(2)), AErr::InvalidArg, "malformed handle");
+    // a handle names its bar
+    const std::string h = makeHandle(crAt(score.get(), 2, 0, 1));
+    const Outcome o = volta(handleAddr(h), bar(2));
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_EQ(o.out.at("startBar").toInt(), 2);
+}
+
+TEST_F(Agent_ExpressionLines, MalformedLineOptionsAreRefused)
+{
+    open("parts-linked.mscz");
+    Params p = lineArgs("volta", bar(1), bar(2));
+    p["endings"] = Val(1.0);
+    expectErr(line(p), AErr::InvalidArg, "non-empty list");
+    p["endings"] = Val(ValList { Val(1.5) });
+    expectErr(line(p), AErr::InvalidArg, "1-100");
+    p["endings"] = Val(ValList { Val(101.0) });
+    expectErr(line(p), AErr::InvalidArg, "1-100");
+    p["endings"] = Val(ValList { Val("1") });
+    expectErr(line(p), AErr::InvalidArg, "1-100");
+
+    p = lineArgs("pedal", pos(1, 1, 3), pos(1, 1, 3));
+    p["kind"] = Val(3.0);
+    expectErr(line(p), AErr::InvalidArg, "'kind' must be a string");
+
+    p = lineArgs("textLine", pos(1, 1, 3), pos(2, 1, 3));
+    p["text"] = Val(true);
+    expectErr(line(p), AErr::InvalidArg, "'text' must be a string");
+    p["text"] = Val("ok");
+    p["endText"] = Val(1.0);
+    expectErr(line(p), AErr::InvalidArg, "'endText' must be a string");
+    p.erase("endText");
+    p["endHook"] = Val("curly");
+    expectErr(line(p), AErr::InvalidArg, "endHook");
+
+    p = lineArgs("trill", pos(1, 1, 3), pos(1, 1, 3));
+    p["trillType"] = Val("mordent");
+    expectErr(line(p), AErr::InvalidArg, "trillType");
+    p = lineArgs("pedal", pos(1, 1, 3), pos(1, 1, 3));
+    p["pedalStyle"] = Val("curly");
+    expectErr(line(p), AErr::InvalidArg, "pedalStyle");
+    p = lineArgs("volta", bar(1), bar(1));
+    p["voltaType"] = Val("half");
+    expectErr(line(p), AErr::InvalidArg, "voltaType");
+}
+
+TEST_F(Agent_ExpressionLines, PlacementIsReadBack)
+{
+    open("pickup-bar.mscz");
+    Params p = lineArgs("pedal", pos(2, 1, 1), pos(2, 3, 1));
+    p["placement"] = Val("above");
+    const Outcome o = line(p);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_EQ(toSpanner(resolveHandle(score.get(), o.str("handle")).val)->placement(), PlacementV::ABOVE);
+    undo();
+    redo();
+    EXPECT_EQ(toSpanner(resolveHandle(score.get(), o.str("handle")).val)->placement(), PlacementV::ABOVE);
 }
 

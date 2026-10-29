@@ -17,6 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 #include "expressionlines.h"
+#include "lineops.h"
 
 #include "registry/commandregistry.h"
 
@@ -43,9 +44,12 @@ void mu::agent::registerExpressionLinesCommands(CommandRegistry& registry)
         c.description
             = "Adds a slur from one chord to another, like selecting the two notes and pressing S. The ends may be in "
               "different bars or systems, different voices, or different staves of the same part (piano RH to LH). "
-              "Refused: a rest at either end (E_INVALID_ARG), both ends on the same chord (E_INVALID_ARG), ends in "
-              "different parts (E_INVALID_ARG), end before start (E_RANGE), no chord starting at an address (E_RANGE, "
-              "the message lists the beats that have events), a slur with the same ends already there (E_EXISTS). "
+              "Refused with E_INVALID_ARG: a rest or a trill cue note at either end, both ends on the same chord, "
+              "start and end at the same time (e.g. two voices on one beat), ends in different parts, ends on two "
+              "linked staves of one part (a staff and its tablature), a malformed address. Refused with E_RANGE: end "
+              "before start, a bar, beat, staff, part or grace index outside the score, no chord starting at an "
+              "address (the message lists the beats that have events). E_STALE_HANDLE: a handle that no longer names "
+              "an element. E_EXISTS: a slur already joins these two chords (whatever its direction). "
               "Linked parts get the slur too. Returns the slur's handle and the touched bars in the compact notation, "
               "where the slur shows as ( ... ). Grace-note slurs are added but not shown in the notation.";
         c.kind = CommandKind::Write;
@@ -77,9 +81,12 @@ void mu::agent::registerExpressionLinesCommands(CommandRegistry& registry)
               "voice 1 (as the palette puts them; the addresses only give the times); start and end must be on the "
               "same staff. A volta takes {\"measure\": n} for start and end and only draws the bracket: add the "
               "end-repeat barline separately. An ottava changes the sounding pitch of the notes under it, which "
-              "score_read then shows. Overlapping lines are allowed, as in the UI. Refused: end before start "
-              "(E_RANGE), no event at an address (E_RANGE), ends on different staves, a grace note as an end, or an "
-              "option that does not apply to the kind (E_INVALID_ARG). Returns the line's handle and the touched bars "
+              "score_read then shows. Overlapping lines are allowed, as in the UI. Refused with E_INVALID_ARG: ends on "
+              "different staves, a grace note as an end, an option that does not apply to the kind, a volta address "
+              "with anything but measure (beat, tick, staff, voice, grace), endings that are empty, repeated, or not "
+              "whole numbers 1-100, a malformed address. Refused with E_RANGE: end before start, a bar, beat, staff or "
+              "part outside the score, no event starting at an address. E_STALE_HANDLE: a handle that no longer names "
+              "an element. Returns the line's handle and the touched bars "
               "in the compact notation (marks +8va[ ... +8va], +ped[ ... +ped], +trl[ ... +trl], "
               "+txt[\"rit.\" ... +txt]; a volta as bar attributes volta=1 ... volta=end).";
         c.kind = CommandKind::Write;
@@ -100,7 +107,7 @@ void mu::agent::registerExpressionLinesCommands(CommandRegistry& registry)
                                                     "angledEnd / angledBoth / angledStart = angled hooks" };
         c.input["pedalStyle"].enumValues = { "line", "asterisk", "straight", "angledEnd", "angledBoth", "angledStart" };
         c.input["endings"] = { DataType::Array, "kind volta only: the passes that play this ending, e.g. [1] or [1, 2] "
-                                                "(default [1])" };
+                                                "(whole numbers 1-100, no repeats; default [1])" };
         c.input["endings"].itemsType = DataType::Integer;
         c.input["voltaType"] = { DataType::String, "kind volta only: closed (hook at the end, default) or open" };
         c.input["voltaType"].enumValues = { "closed", "open" };

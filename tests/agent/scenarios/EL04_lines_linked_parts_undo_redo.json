@@ -75,7 +75,7 @@
         "text": "accel.",
         "system": true
       },
-      "note": "a system text line goes on the top staff and into every part, whatever staff the address names (score_read does not print it yet, reported with P2.4: checked in the export)"
+      "note": "a system text line goes on the top staff and into every part, whatever staff the address names; score_read does not print system text lines (still true after ddc7dc16fe), so the next step checks the export"
     },
     {
       "assert": "exportMember",
@@ -107,7 +107,7 @@
       },
       "expect": {
         "bars": {
-          "contains": "+trl["
+          "contains": "m4 v1 | B4:w+trl[+trl]"
         }
       },
       "note": "a trill in a score with parts: every linked copy needs its ornament (spec crash risk)"
@@ -158,7 +158,10 @@
               "contains": "volta=1"
             },
             {
-              "contains": "+trl["
+              "contains": "volta=end"
+            },
+            {
+              "contains": "+trl[+trl]"
             }
           ]
         }
@@ -174,5 +177,8 @@
   "invariants": {
     "validate": true,
     "undoRedo": true
-  }
+  },
+  "questions": [
+    "score_read prints no mark for a system text line (TextLine with the system flag); once it does, check +txt[\"accel.\" on m1 beat 1 and +txt] on m2 beat 4 of staff 1 here."
+  ]
 }

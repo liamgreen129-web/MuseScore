@@ -31,7 +31,7 @@
 //   the user's selection is never touched and applyPaletteElement's checkAndShowError (a dialog)
 //   is never reached (spec F5, Q2 option 2).
 
-#include "expressionlines.h"
+#include "lineops.h"
 
 #include <algorithm>
 #include <cmath>
@@ -393,7 +393,12 @@ RetVal<Measure*> resolveBar(MasterScore* score, const Val& v, const std::string&
             rv.ret = makeErr(Err::InvalidArg, what + ": a volta covers whole bars, so give {measure} only (no " + k + ")");
             return rv;
         }
-        if (k != "measure" && k != "staff" && k != "voice") {
+        if (k == "staff" || k == "voice") {
+            rv.ret = makeErr(Err::InvalidArg, what + ": a volta goes over the whole system (top staff and every part), so give "
+                             "{measure} only (no " + k + ")");
+            return rv;
+        }
+        if (k != "measure") {
             rv.ret = makeErr(Err::InvalidArg, what + " has unknown key '" + k + "' (expected measure)");
             return rv;
         }
@@ -626,10 +631,11 @@ Ret mu::agent::lines::addSlur(MasterScore* score, const Params& p, std::map<std:
     if (direction.val != "auto") {
         slur->undoChangeProperty(Pid::SLUR_DIRECTION, PropertyValue(direction.val == "up" ? DirectionV::UP : DirectionV::DOWN));
     }
+    const SlurStyleType wantStyle = style.val == "dashed" ? SlurStyleType::Dashed
+                                    : style.val == "dotted" ? SlurStyleType::Dotted
+                                    : style.val == "wideDashed" ? SlurStyleType::WideDashed : SlurStyleType::Solid;
     if (style.val != "solid") {
-        const SlurStyleType st = style.val == "dashed" ? SlurStyleType::Dashed
-                                 : style.val == "dotted" ? SlurStyleType::Dotted : SlurStyleType::WideDashed;
-        slur->undoChangeProperty(Pid::SLUR_STYLE_TYPE, PropertyValue(st));
+        slur->undoChangeProperty(Pid::SLUR_STYLE_TYPE, PropertyValue(wantStyle));
     }
 
     // 3. check the effect on the spanner model (no layout until commit, spec F2)
@@ -653,6 +659,10 @@ Ret mu::agent::lines::addSlur(MasterScore* score, const Params& p, std::map<std:
         if (Ret r = core::expect(slur->slurDirection() == want, "the slur's direction was not set"); !r) {
             return r;
         }
+    }
+    if (Ret r = core::expect(slur->getProperty(Pid::SLUR_STYLE_TYPE).value<SlurStyleType>() == wantStyle,
+                             "the slur's line style is not " + style.val); !r) {
+        return r;
     }
 
     out["handle"] = Val(core::makeHandle(slur));
@@ -719,7 +729,7 @@ Ret mu::agent::lines::addLine(MasterScore* score, const Params& p, std::map<std:
         endings.clear();
         for (const Val& n : e.toList()) {
             if (!isInteger(n) || n.toDouble() < 1 || n.toDouble() > 100) {
-                return makeErr(Err::InvalidArg, "endings must be whole numbers from 1 (the passes that play this ending)");
+                return makeErr(Err::InvalidArg, "endings must be whole numbers 1-100 (the passes that play this ending)");
             }
             endings.push_back(static_cast<int>(n.toDouble()));
         }
@@ -752,8 +762,12 @@ Ret mu::agent::lines::addLine(MasterScore* score, const Params& p, std::map<std:
         if (endBar < startBar) {
             return makeErr(Err::Range, "end bar m" + std::to_string(endBar) + " comes before start bar m" + std::to_string(startBar));
         }
-        startSeg = m1.val->first(SegmentType::ChordRest);
-        endSeg = m2.val->nextMeasure() ? m2.val->last() : nullptr;
+        // exactly as Score::select(measure, RANGE) picks them (score.cpp:3548-3550), including the
+        // mapping onto a covering multimeasure rest when the score shows them
+        Measure* first = m1.val->coveringMMRestOrThis();
+        Measure* last = m2.val->coveringMMRestOrThis();
+        startSeg = first->first(SegmentType::ChordRest);
+        endSeg = last == score->lastMeasureMM() ? nullptr : last->last();
         if (!startSeg) {
             return makeErr(Err::Range, "bar m" + std::to_string(startBar) + " has no chord/rest segment to start a volta on");
         }
@@ -907,6 +921,12 @@ Ret mu::agent::lines::addLine(MasterScore* score, const Params& p, std::map<std:
     }
     if (kind.val == "trill") {
         if (Ret r = core::expect(toTrill(spanner)->ornament() != nullptr, "the trill has no ornament"); !r) {
+            return r;
+        }
+    }
+    if (placement.val != "default") {
+        const PlacementV want = placement.val == "above" ? PlacementV::ABOVE : PlacementV::BELOW;
+        if (Ret r = core::expect(spanner->placement() == want, "the " + kind.val + "'s placement is not " + placement.val); !r) {
             return r;
         }
     }

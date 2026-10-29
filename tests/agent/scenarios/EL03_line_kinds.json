@@ -87,14 +87,7 @@
       },
       "expect": {
         "bars": {
-          "all": [
-            {
-              "contains": "+trl["
-            },
-            {
-              "contains": "+trl]"
-            }
-          ]
+          "contains": "m4(3) v1 | B4:h+trl[+trl] A4:q"
         }
       }
     },
@@ -118,10 +111,9 @@
       },
       "expect": {
         "bars": {
-          "contains": "m5(4) v1 | E4:h+ped[ D4:q"
+          "contains": "m5(4) v1 | E4:h+ped[ D4:q+ped]"
         }
-      },
-      "note": "the end mark prints on the next event (m6): a read-printer issue reported with P2.4; tick2 is checked by the unit tests"
+      }
     },
     {
       "tool": "add_line",
@@ -134,7 +126,7 @@
           "staff": 1
         },
         "end": {
-          "measure": 7,
+          "measure": 8,
           "beat": 1,
           "staff": 1
         },
@@ -142,10 +134,17 @@
       },
       "expect": {
         "bars": {
-          "contains": "m6(5) v1 | G4:h+txt[\"rit.\""
+          "all": [
+            {
+              "contains": "m6(5) v1 | G4:h+txt[\"rit.\" F4:q"
+            },
+            {
+              "contains": "m8(7) v1 | C5:h+txt]"
+            }
+          ]
         }
       },
-      "note": "ends mid-score: a staff text line running to the last note is not printed by score_read (reported with P2.4)"
+      "note": "runs to the last note of the score"
     },
     {
       "tool": "add_line",

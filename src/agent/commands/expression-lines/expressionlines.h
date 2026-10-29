@@ -18,30 +18,10 @@
  */
 #pragma once
 
-#include <map>
-#include <string>
-
-#include "global/types/ret.h"
-#include "global/types/val.h"
-
-#include "registry/commandtypes.h"
-
-namespace mu::engraving {
-class MasterScore;
-}
-
 namespace mu::agent {
 class CommandRegistry;
 
 //! The expression-lines group (docs/agent/specs/expression-lines.md): add_slur, add_line.
+//! The handlers are in lineops.h (library agent_lines, engraving only).
 void registerExpressionLinesCommands(CommandRegistry& registry);
-
-namespace lines {
-//! The write handlers, on the engraving model only (no app services), so the unit tests run
-//! them inside a core Transaction on a fixture. They validate everything before changing the
-//! score, edit through the same Score calls the UI ends in, check the effect, and put their
-//! results in `out`. They never open, lock, commit or roll back anything.
-muse::Ret addSlur(mu::engraving::MasterScore* score, const Params& params, std::map<std::string, muse::Val>& out);
-muse::Ret addLine(mu::engraving::MasterScore* score, const Params& params, std::map<std::string, muse::Val>& out);
-}
 }

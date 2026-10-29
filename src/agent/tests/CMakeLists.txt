@@ -23,6 +23,7 @@ set(MODULE_TEST_LINK
     agent_core
     agent_notes
     agent_address
+    agent_lines
     engraving
 )
 
