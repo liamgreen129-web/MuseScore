@@ -9,7 +9,7 @@ Status values: `—` not started · `spec` spec sheet done · `impl` implemented
 
 | Group | Commands | Phase | Owner | Spec | Impl |
 |---|---|---|---|---|---|
-| `session` | hello, instances_list, scores_list, score_open, undo, redo, save, backup_snapshot | 1–3 | Conductor | — | — |
+| `session` | hello, instances_list, scores_list, score_open, undo, redo, save, backup_snapshot | 1–3 | Conductor | spec | — |
 | `read` | score_overview, score_read, score_export, score_render, score_changes, score_validate | 1 | Conductor | — | — |
 | `notes` | write_voice, add_note_to_chord, remove_note, set_duration, tie, tuplet, grace, clear_range, exchange_voices, batch | 2 | Conductor | spec | — |
 | `pitch` | set_pitch, transpose | 2 | Wave A | spec | — |
