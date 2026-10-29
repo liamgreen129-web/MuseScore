@@ -89,3 +89,5 @@ build.log
 agent.install/
 g0-snapshot/
 tests/fixtures/corpus/
+build.tests/
+test.log

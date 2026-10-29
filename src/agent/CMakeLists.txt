@@ -1,6 +1,28 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # MuseScore Agent: in-process MCP server and score command set (see docs/agent/).
 
+# The compact notation (NOTATION.md): plain C++, no Qt or MuseScore dependencies,
+# so the parser and writer are tested on their own.
+add_library(agent_notation STATIC
+    notation/ast.cpp
+    notation/ast.h
+    notation/parser.cpp
+    notation/parser.h
+    notation/validate.cpp
+    notation/validate.h
+    notation/writer.cpp
+    notation/writer.h
+)
+target_include_directories(agent_notation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Score -> notation (read side). Depends on the engraving model.
+muse_create_module(agent_read NO_UNITY)
+target_sources(agent_read PRIVATE
+    read/scoreprinter.cpp
+    read/scoreprinter.h
+)
+target_link_libraries(agent_read PUBLIC agent_notation engraving)
+
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 
 target_sources(agent PRIVATE
@@ -33,6 +55,10 @@ target_sources(agent PRIVATE
     server/tokenstore.h
 )
 
-target_link_libraries(agent PRIVATE Qt::Network)
+target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read)
 
 target_compile_definitions(agent PRIVATE AGENT_BUNDLE_ID="${MUSE_APP_GUI_IDENTIFIER}")
+
+if (MUSE_ENABLE_UNIT_TESTS)
+    add_subdirectory(tests)
+endif()

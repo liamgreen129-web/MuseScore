@@ -1,7 +1,7 @@
 # MuseScore Agent compact notation
 
-**Status: DRAFT for Liam's review (P1.3, STOP).** Nothing in P1.4 is built until this is
-approved. Every example below was printed by `tools/notation_ref/m21_print.py` from a real
+**Status: approved by Liam, 2026-10-29.** Changes go through DECISIONS.md. This was a
+draft until then. Every example below was printed by `tools/notation_ref/m21_print.py` from a real
 score, not typed by hand (sources at the end).
 
 This is the one text format the agent uses to **read** music (`score_read`) and to
