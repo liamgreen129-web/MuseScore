@@ -129,7 +129,8 @@ carries the start code and end at the event that carries the end code, in the sa
 | `repeat` | `repeat=start`, `repeat=end`, `repeat=end:3` (play 3 times) |
 | `volta` | `volta=1`, `volta=1,2` (ending starts here), `volta=end` |
 | `barline` | `barline=double`, `final`, `dashed`, `dotted`, `none` (the barline at the end of this bar) |
-| `jump` | `jump="D.S. al Coda"`, `marker=segno`, `marker=coda`, `marker=fine` |
+| `jump` | `jump="D.S. al Coda"`, `jump="D.C. al Fine"` (the jump's text) |
+| `marker` | `marker=segno`, `marker=coda` (the coda sign), `marker=tocoda` ("To Coda"), `marker=codetta`, `marker=fine`, other text `marker="..."` |
 | `break` | `break=line`, `break=page`, `break=section` |
 | `len` | `len=1/4` (actual length when it differs from the time signature: pickups, irregular bars) |
 

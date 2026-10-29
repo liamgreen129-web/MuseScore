@@ -193,7 +193,11 @@ TEST(Agent_ScorePrinter, EveryFixtureRoundTripsPitchAndRhythm)
         }
 
         const ParseResult parsed = parse(text);
-        ASSERT_TRUE(parsed.ok()) << parsed.errors[0].toString();
+        if (!parsed.ok()) {
+            ADD_FAILURE() << "printed text does not parse: " << parsed.errors[0].toString();
+            delete score;
+            continue;
+        }
         if (!(parsed.doc == doc)) {
             for (size_t i = 0; i < std::min(doc.lines.size(), parsed.doc.lines.size()); ++i) {
                 if (!(doc.lines[i] == parsed.doc.lines[i])) {
@@ -233,11 +237,18 @@ TEST(Agent_ScorePrinter, EveryFixtureRoundTripsPitchAndRhythm)
         const auto fromText = textSounds(parsed.doc, barStart, lengths);
         for (const auto& [key, sounds] : model) {
             auto it = fromText.find(key);
-            ASSERT_NE(it, fromText.end()) << "staff " << key.first << " voice " << key.second << " missing from the text";
-            ASSERT_EQ(it->second.size(), sounds.size()) << "staff " << key.first << " voice " << key.second;
-            for (size_t i = 0; i < sounds.size(); ++i) {
-                ASSERT_EQ(it->second[i], sounds[i]) << "staff " << key.first << " voice " << key.second << " event " << i
-                                                    << ": text " << show(it->second[i]) << " model " << show(sounds[i]);
+            if (it == fromText.end()) {
+                ADD_FAILURE() << "staff " << key.first << " voice " << key.second << " missing from the text";
+                continue;
+            }
+            EXPECT_EQ(it->second.size(), sounds.size()) << "staff " << key.first << " voice " << key.second;
+            for (size_t i = 0; i < std::min(sounds.size(), it->second.size()); ++i) {
+                if (it->second[i] == sounds[i]) {
+                    continue;
+                }
+                ADD_FAILURE() << "staff " << key.first << " voice " << key.second << " event " << i
+                              << ": text " << show(it->second[i]) << " model " << show(sounds[i]);
+                break; // first mismatch per voice is enough
             }
         }
         delete score;

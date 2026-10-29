@@ -32,6 +32,8 @@
 #include "engraving/dom/hairpin.h"
 #include "engraving/dom/harmony.h"
 #include "engraving/dom/instrument.h"
+#include "engraving/dom/jump.h"
+#include "engraving/dom/marker.h"
 #include "engraving/dom/key.h"
 #include "engraving/dom/lyrics.h"
 #include "engraving/dom/measure.h"
@@ -51,6 +53,7 @@
 #include "engraving/dom/tie.h"
 #include "engraving/dom/timesig.h"
 #include "engraving/dom/tuplet.h"
+#include "engraving/dom/volta.h"
 #include "engraving/types/symnames.h"
 #include "engraving/types/typesconv.h"
 
@@ -290,6 +293,7 @@ public:
         if (measures.empty()) {
             return doc;
         }
+        collectVoltas(measures);
         const int from = std::max(1, m_opt.fromBar);
         const int to = m_opt.toBar > 0 ? std::min<int>(m_opt.toBar, static_cast<int>(measures.size())) : static_cast<int>(measures.size());
 
@@ -674,6 +678,16 @@ private:
             if (m->repeatStart()) {
                 attrs.attrs.push_back({ "repeat", "start" });
             }
+            if (auto vit = m_voltaAttrs.find(idx); vit != m_voltaAttrs.end()) {
+                attrs.attrs.insert(attrs.attrs.end(), vit->second.begin(), vit->second.end());
+            }
+            for (const EngravingItem* el : m->el()) {
+                if (el->isMarker()) {
+                    attrs.attrs.push_back({ "marker", markerName(toMarker(el)) });
+                } else if (el->isJump()) {
+                    attrs.attrs.push_back({ "jump", "\"" + plain(toJump(el)->plainText()) + "\"" });
+                }
+            }
             if (m->repeatEnd()) {
                 attrs.attrs.push_back({ "repeat", m->repeatCount() == 2 ? std::string("end") : "end:" + std::to_string(m->repeatCount()) });
             } else {
@@ -728,13 +742,66 @@ private:
         }
     }
 
+    //! Voltas are system spanners; NOTATION.md section 6 prints them as bar attributes:
+    //! volta=1,2 on the first bar, volta=end on the last bar they cover.
+    void collectVoltas(const std::vector<const Measure*>& measures)
+    {
+        auto barOf = [&](const Fraction& tick) {
+            for (size_t i = 0; i < measures.size(); ++i) {
+                if (tick >= measures[i]->tick() && tick < measures[i]->tick() + measures[i]->ticks()) {
+                    return static_cast<int>(i) + 1;
+                }
+            }
+            return 0;
+        };
+        for (const auto& [tick, sp] : m_score->spanner()) {
+            if (!sp->isVolta()) {
+                continue;
+            }
+            const Volta* v = toVolta(sp);
+            std::string endings;
+            for (int e : v->endings()) {
+                endings += (endings.empty() ? "" : ",") + std::to_string(e);
+            }
+            const int first = barOf(v->tick());
+            const int last = barOf(v->tick2() - Fraction(1, 1920));
+            if (first) {
+                m_voltaAttrs[first].push_back({ "volta", endings.empty() ? "?" : endings });
+            }
+            if (last) {
+                m_voltaAttrs[last].push_back({ "volta", "end" });
+            }
+        }
+    }
+
+    static std::string markerName(const Marker* mk)
+    {
+        switch (mk->markerType()) {
+        case MarkerType::SEGNO:
+        case MarkerType::VARSEGNO: return "segno";
+        case MarkerType::CODA:
+        case MarkerType::VARCODA: return "coda";
+        case MarkerType::CODETTA: return "codetta";
+        case MarkerType::FINE: return "fine";
+        case MarkerType::TOCODA:
+        case MarkerType::TOCODASYM: return "tocoda";
+        default: return "\"" + plain(mk->plainText()) + "\"";
+        }
+    }
+
     void printHarmony(nt::Document& doc, const Measure* m, staff_idx_t si, const nt::BarRef& ref, const nt::Rational& barLen) const
     {
         std::vector<std::pair<nt::Rational, std::string> > chords;
         for (const Segment* s = m->first(); s; s = s->next()) {
             for (const EngravingItem* a : s->annotations()) {
                 if (a->isHarmony() && a->track() / VOICES == si) {
-                    chords.emplace_back(toRational(s->rtick()), plain(toHarmony(a)->harmonyName()));
+                    std::string name = plain(toHarmony(a)->harmonyName());
+                    if (name.empty()) {
+                        name = plain(toHarmony(a)->plainText()); // e.g. "N.C." has no harmony name
+                    }
+                    if (!name.empty()) {
+                        chords.emplace_back(toRational(s->rtick()), name);
+                    }
                 }
             }
         }
@@ -763,6 +830,7 @@ private:
     const Score* m_score;
     ReadOptions m_opt;
     SpannerMarks m_spanners;
+    std::map<int, std::vector<nt::KeyValue> > m_voltaAttrs;
     mutable std::vector<std::string> m_details; // "% detail:" lines for the voice line being built
     int m_barIndex = 0;
 };
