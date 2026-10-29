@@ -4,17 +4,19 @@ Updated by the conductor at the end of every session and before every STOP.
 
 - **Machine:** MacBook Pro (M1 Pro, 16 GB) for now; Mac mini later (DECISIONS 2026-10-29)
 - **Phase:** 2
-- **Current task:** P2.3 write_voice (conductor), design below. P2.4 Wave A running: expression-marks and expression-lines implementers in their own worktrees. P2.2 merged (c0416deaf9) after review fixes. P2.1 done: tag `core-v1` (e57ee76e91).
-- **Last finished (2026-10-29):** P1.1–P1.8 (G1 signed off by Liam 2026-10-29), P2.1 core (see CORE.md), P2.2 scenario driver + soak (tests/agent/harness, tests/agent/scenarios)
-- **Test status at last commit:** scripts/test.sh 50/50 (22 core/handles + 28 notation/printer); tests/agent/test_server.py 29/29, test_hello.py 32/32, test_read.py 39/39, test_core.py 53/53, test_export.py 160/160 (full run at G1; spot-checked after P2.2); scenarios/run.py 3 ok, 20 SKIP (tools not yet built), run PASS
+- **Current task:** P2.4 Wave A merges. Both groups were reviewed ("changes required") and sent back to their implementers with the fixes listed in DECISIONS 2026-10-29: expression-lines on branch worktree-agent-ab69e3b5b93ceb103, expression-marks on worktree-agent-a326fe74a251e643f. Both were told to rebase onto agent/4.7.
+- **Last finished (2026-10-29):** P2.3 write_voice (10ede70fe5); read printer end-mark fix (ddc7dc16fe); P2.2 harness; P2.1 core (core-v1); P1 (G1 signed off).
+- **Test status at last commit:** scripts/test.sh 61/61 (write_voice round trip: 66 synthetic + 102 corpus staves); test_server, test_hello, test_read, test_core PASS; test_export spot-check (bwv66, stress-combined, op74) 0 failures; scenarios 8 ok / 15 SKIP / 0 FAIL; check-identity PASS.
 - **Next:**
-  1. P2.3 write_voice (design below), then the rest of the notes group.
-  2. Merge Wave A branches per protocol as they report (reviewer first; rebuild here; rerun everything); then start `text` and `pitch` implementers.
-  3. Before G2: add a `test_modal` action (open/close a modal) to test_dispatch so S18 runs; `--update-goldens` for S01–S20 as their tools land, reviewing each golden.
+  1. When each implementer reports, rerun everything here on its branch, then merge per protocol: drop or keep the allcommands commit; reconcile address shapes (staff as int | {part,index} in all groups); update COMMANDS.md.
+  2. Then start the `text` and `pitch` implementers (Wave A, at most 2 at once). Tell them: engraving-only library per group (like agent_notes), default behaviour never depends on app preferences, error codes from errors.h only.
+  3. The rest of the notes group (add_note_to_chord, remove_note, set_duration, tie, tuplet, grace, clear_range, exchange_voices). Conductor.
+  4. Before G2: add a `test_modal` hook so S18 can run; record goldens for S01–S20 as their commands land.
+  5. Follow-up: check whether the upstream close-time crash (DECISIONS 2026-10-29) can happen in the app when a score is closed after a big delete.
 - **Blockers / waiting on Liam:**
   1. Update the daily app 4.7.4 → 4.7.6.
-- **Background jobs:** command-implementer for expression-marks; command-implementer for expression-lines (see DECISIONS for branch names when they report)
-- **Worktrees in use:** the two Wave A implementers' (under .claude/worktrees/)
+- **Background jobs:** the expression-lines and expression-marks implementers (review fixes).
+- **Worktrees in use:** .claude/worktrees/agent-ab69e3b5b93ceb103 (lines) and .claude/worktrees/agent-a326fe74a251e643f (marks); remove each after its merge.
 - **Notes for the next session:**
   - **write_voice design (P2.3, decided, not yet coded)** — file `src/agent/commands/notes/` (own register.cpp; conductor adds to allcommands):
     - Args: `staff` (int, 1-based like score_read), `content` = notation voice lines `m<N> v<V> | ...` exactly as score_read prints (headers/comments ignored; bar attrs, harmony lines, `+marks` and slurs refused in v1 with a message naming the commands that add them), `pitch` sounding|written (default sounding), `keepAnnotations` (default true). Each (bar, voice) line replaces that voice in that bar.
