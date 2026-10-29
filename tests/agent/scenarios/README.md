@@ -8,12 +8,14 @@ background instance at a time, each on a fresh temp copy of its fixture.
 python3 -I tests/agent/scenarios/run.py                 # all scenarios
 python3 -I tests/agent/scenarios/run.py S01 R02 slur    # by id or file-name substring
 python3 -I tests/agent/scenarios/run.py --list
-python3 -I tests/agent/scenarios/run.py S05 --update-goldens   # write goldens, then review the diff
+python3 -I tests/agent/scenarios/run.py S05 --update-goldens   # write goldens (only if nothing FAILs), then review the diff
 python3 -I tests/agent/scenarios/run.py --undo-tool undo --redo-tool redo --bundle path/to/mscore.app
 ```
 
 Output is one `ok` / `FAIL` / `SKIP` line per check, prefixed with the scenario id, then a
-summary. Exit 1 on any FAIL, 2 on a setup error. Standard library only; runs on the system
+summary. Exit 1 on any FAIL or incomplete scenario, 2 on a setup error. A scenario is
+**incomplete** when some of its checks ran and some were skipped (an undo/redo invariant with no
+undo tool, say): that is not a pass, and the run says `INCOMPLETE`. Standard library only; runs on the system
 Python 3.9 and on 3.12.
 
 A scenario is **SKIP** (not FAIL) when a tool it calls is not in the build's `tools/list`, or
@@ -41,7 +43,8 @@ in the scenario.
   "fixture": "corpus/bach-bwv66-6.mscz",   // synthetic/… or corpus/…; never tests/fixtures/real
   "specs": ["specs/expression-marks.md add_dynamic"],
   "manual": "…",                     // optional: what part is manual or needs a future hook
-  "needsHooks": ["_test_modal"],     // optional: SKIP until these tools exist
+  "needsHooks": ["test_modal"],      // optional: SKIP until these tools exist
+  "testCommands": true,              // optional: start the instance with the test_* hooks
   "requires": ["undo"],              // optional: extra tools that must exist
   "steps": [ … ],
   "goldens": [{"format": "musicxml", "path": "goldens/S01_single_dynamic.musicxml"}],
@@ -119,9 +122,11 @@ bars' notation yet. Once it is fixed, `expect` on that field is shorter.
 | R03 | whole-score read refused with a range that fits; bad args refused, score untouched | corpus/beethoven-op74 | runs today |
 | S01–S20 | assessment.md Phase 2 list | see each file | SKIP until the tools exist |
 
-S17 (concurrent user edit) uses a second agent write as the stand-in for the user. S18 (modal
-dialog) and S19 (playback) need test hooks (`_test_modal`, `_test_playback`) that do not
-exist; their `manual` field says how to run them by hand meanwhile. S20 checks the linked
+S17 (concurrent user edit) uses a second agent write as the stand-in for the user. A scenario
+with `"testCommands": true` runs its instance with `MUSESCORE_AGENT_TEST_COMMANDS=1`, which adds
+the `test_*` hooks. S19 (playback) uses `test_dispatch` and plays about a second of audio. S18
+(modal dialog) needs a `test_modal` hook that main does not have yet, so it SKIPs; its `manual`
+field says how to run it by hand meanwhile. S20 checks the linked
 parts inside the mscz export, since there is no command to make a part the current view.
 
 ### Address conventions assumed (until the core fixes them)

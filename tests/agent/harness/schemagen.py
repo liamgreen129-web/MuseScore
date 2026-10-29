@@ -124,9 +124,13 @@ def _array(schema, rng, hints, root, name, depth):
         if schema.get("uniqueItems") and v in out:
             continue
         out.append(v)
-    while len(out) < lo:  # uniqueItems could leave it short
-        out.append(generate(items, rng, hints, root, name, depth + 1))
-    return out
+    tries = 0
+    while len(out) < lo and tries < 50:  # uniqueItems could leave it short
+        tries += 1
+        v = generate(items, rng, hints, root, name, depth + 1)
+        if not (schema.get("uniqueItems") and v in out):
+            out.append(v)
+    return out  # may still be short: the caller's validate() reports it as a generator miss
 
 
 def _bounds(schema, integer):
@@ -198,8 +202,8 @@ def regex_sample(pattern, rng):
             if re.search(pattern, out):
                 return out
         except re.error:
-            return out
-    return out
+            return out  # an unsupported pattern: validate() cannot check it either
+    return out  # no match after 20 tries: the caller's validate() reports a generator miss
 
 
 def _alt(p, i, rng):

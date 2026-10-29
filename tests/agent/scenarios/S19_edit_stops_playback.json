@@ -6,22 +6,26 @@
   "specs": [
     "assessment.md Phase 2 S19"
   ],
-  "manual": "Needs a test hook to start playback and report its state (proposed tool `_test_playback` with {action: start|status}). Playback in a background instance may need an audio device; check on the Mac mini.",
+  "manual": "Uses main's test hook test_dispatch (play, and escape as a status probe), enabled by \"testCommands\": true. The background instance plays audio for about a second. If playback does not start in a background instance the 'playing: true' check fails; test_core.py treats that case as a note.",
   "needsHooks": [
-    "_test_playback"
+    "test_dispatch"
   ],
   "steps": [
     {
-      "tool": "_test_playback",
+      "tool": "test_dispatch",
       "args": {
-        "action": "start"
+        "action": "play"
       }
     },
     {
-      "tool": "_test_playback",
+      "wait": 1
+    },
+    {
+      "tool": "test_dispatch",
       "args": {
-        "action": "status"
+        "action": "escape"
       },
+      "note": "status probe",
       "expect": {
         "playing": true
       }
@@ -42,10 +46,14 @@
       }
     },
     {
-      "tool": "_test_playback",
+      "wait": 1
+    },
+    {
+      "tool": "test_dispatch",
       "args": {
-        "action": "status"
+        "action": "escape"
       },
+      "note": "status probe",
       "expect": {
         "playing": false
       }
@@ -62,6 +70,7 @@
     "undoRedo": true
   },
   "questions": [
-    "No spec covers playback; who stops it (core before every write, or each command) and whether the write reports that it stopped playback is undecided."
-  ]
+    "Settled 2026-10-29 (core-v1): the runner stops playback before every write, after the request passes its checks; the write does not report it."
+  ],
+  "testCommands": true
 }

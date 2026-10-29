@@ -23,6 +23,11 @@ def norm_xml(data):
     return re.sub(rb"<programRevision>[^<]*</programRevision>", b"<programRevision/>", data)
 
 
+def _rootfile_ignored(line, ignored):
+    m = re.search(rb"""full-path\s*=\s*["']([^"']*)["']""", line)
+    return bool(m) and bool(ignored.search(m.group(1).decode("utf-8", "replace")))
+
+
 def zip_members(data, ignored=None):
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         members = {n: z.read(n) for n in z.namelist() if not (ignored and ignored.search(n))}
@@ -39,7 +44,7 @@ def zip_members(data, ignored=None):
         for n in members:
             if n.endswith("container.xml"):
                 members[n] = b"\n".join(line for line in members[n].split(b"\n")
-                                        if not (b"full-path=" in line and ignored.search(line.split(b'"')[1].decode())))
+                                        if not _rootfile_ignored(line, ignored))
     return members
 
 

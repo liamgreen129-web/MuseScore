@@ -7,13 +7,13 @@
     "assessment.md risks (E_BUSY / modal)",
     "specs/session.md"
   ],
-  "manual": "Needs a test hook that opens and closes a modal dialog in the instance (proposed tool `_test_modal` with {action: open|close}, built only with a test flag). Manual alternative: open Preferences in the instance by hand and run the add_dynamic step.",
+  "manual": "Needs a test hook that opens and closes a modal dialog in the instance. main has none yet (test_dispatch covers note input and playback); the conductor adds a modal action to test_dispatch before Gate G2. Until then this scenario SKIPs. Manual alternative: open Preferences in the instance by hand and run the add_dynamic step.",
   "needsHooks": [
-    "_test_modal"
+    "test_modal"
   ],
   "steps": [
     {
-      "tool": "_test_modal",
+      "tool": "test_modal",
       "args": {
         "action": "open"
       }
@@ -45,7 +45,7 @@
       "note": "reads still allowed (assumed)"
     },
     {
-      "tool": "_test_modal",
+      "tool": "test_modal",
       "args": {
         "action": "close"
       }
@@ -80,7 +80,8 @@
     "undoRedo": true
   },
   "questions": [
-    "Error code: assessment says refusal while modal/progress dialogs are open and lists E_MODAL_OPEN in notes.md's reused codes; session.md uses E_BUSY for related cases. Which one?",
+    "Settled 2026-10-29 (core-v1): E_MODAL_OPEN for an open dialog, E_BUSY for edits in progress.",
     "Whether reads are also refused while a modal is open is not stated."
-  ]
+  ],
+  "testCommands": true
 }

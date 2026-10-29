@@ -50,19 +50,33 @@ class InstanceError(RuntimeError):
     pass
 
 
+def allowed_fixture(path):
+    """`path` resolved, if it is inside tests/fixtures/{synthetic,corpus}; otherwise InstanceError.
+    Resolving first means neither `..` nor a symlink can reach tests/fixtures/real."""
+    real = pathlib.Path(path).resolve()
+    for d in FIXTURE_DIRS:
+        try:
+            real.relative_to(d.resolve())
+            return real
+        except ValueError:
+            continue
+    raise InstanceError(f"{path}: only tests/fixtures/synthetic and tests/fixtures/corpus may be opened")
+
+
 def find_fixture(name):
     """'corpus/bach-bwv66-6.mscz', 'bach-bwv66-6.mscz' or 'bach-bwv66-6' -> an existing path."""
     p = pathlib.Path(name)
     if p.is_absolute():
-        if "fixtures/real" in str(p):
-            raise InstanceError("tests/fixtures/real is off limits to the harness")
-        return p if p.exists() else None
+        return allowed_fixture(p) if p.exists() else None
     if p.suffix != ".mscz":
         p = p.with_suffix(".mscz")
     for d in FIXTURE_DIRS:
         for cand in (d.parent / p, d / p.name):
-            if cand.exists() and d.name in cand.parts:
-                return cand
+            if cand.exists():
+                try:
+                    return allowed_fixture(cand)
+                except InstanceError:
+                    continue
     return None
 
 
@@ -77,9 +91,17 @@ def list_fixtures():
     return out
 
 
-def agent_pids():
-    out = subprocess.run(["pgrep", "-f", "MacOS/mscore"], capture_output=True, text=True).stdout.split()
-    return {int(p) for p in out}
+def agent_pids(bundle):
+    """Pids running exactly this bundle's executable. Never a bare "MacOS/mscore" match: that
+    would also catch the official MuseScore 4 and the installed MuseScore Agent.app."""
+    exe = str(pathlib.Path(bundle).resolve() / "Contents/MacOS/mscore")
+    out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout
+    pids = set()
+    for line in out.splitlines():
+        pid, _, cmd = line.strip().partition(" ")
+        if cmd == exe or cmd.startswith(exe + " "):
+            pids.add(int(pid))
+    return pids
 
 
 def _listening_ports(pid):
@@ -102,7 +124,7 @@ class Instance:
 
     Always stops the process and removes the temp folder and the export files it fetched."""
 
-    def __init__(self, fixture=None, bundle=None, open_timeout=90, log=None):
+    def __init__(self, fixture=None, bundle=None, open_timeout=90, log=None, env=None):
         self.bundle = pathlib.Path(bundle or DEFAULT_BUNDLE)
         self.fixture = None
         self.score_path = None
@@ -115,9 +137,10 @@ class Instance:
         self._tools = None
         self._rid = 0
         self.log = log or (lambda msg: None)
+        self.env = dict(env or {})
         if fixture is not None:
-            src = find_fixture(fixture) if not isinstance(fixture, pathlib.Path) else fixture
-            if src is None or not src.exists():
+            src = find_fixture(str(fixture))
+            if src is None:
                 raise InstanceError(f"fixture not found: {fixture}")
             self.fixture = src
         self.open_timeout = open_timeout
@@ -149,97 +172,148 @@ class Instance:
         return self
 
     def _launch(self, args):
-        before = agent_pids()
-        cmd = ["open", "-n", "-g", "-j", "--env", "MUSESCORE_AGENT_BACKGROUND=1", "-a", str(self.bundle)] + args
+        self._before = agent_pids(self.bundle)
+        env = ["--env", "MUSESCORE_AGENT_BACKGROUND=1"]
+        for k, v in self.env.items():
+            env += ["--env", f"{k}={v}"]
+        cmd = ["open", "-n", "-g", "-j"] + env + ["-a", str(self.bundle)] + args
         self.started = time.time()
         subprocess.run(cmd, check=True, capture_output=True)
         deadline = time.time() + 30
         while time.time() < deadline:
-            new = agent_pids() - before
-            if new:
-                self.pid = min(new)
+            if agent_pids(self.bundle) - self._before:
                 return
             time.sleep(0.3)
         raise InstanceError("agent build did not start")
 
-    def _find_port(self):
-        rec = AGENT_DIR / "instances" / f"{self.pid}.json"
+    def _find_port(self, pid):
+        rec = AGENT_DIR / "instances" / f"{pid}.json"
         try:
             port = json.loads(rec.read_text()).get("port")
             if port:
                 return int(port)
         except (OSError, ValueError):
             pass
-        ports = _listening_ports(self.pid)
+        ports = _listening_ports(pid)
         return ports[0] if ports else None
 
-    def _wait_ready(self):
-        deadline = time.time() + self.open_timeout
-        while time.time() < deadline and self.port is None:
-            if not self.alive():
-                raise InstanceError(f"pid {self.pid} exited during start-up")
-            self.port = self._find_port()
-            if self.port is None:
-                time.sleep(0.5)
-        if self.port is None:
-            raise InstanceError(f"pid {self.pid}: no agent port within {self.open_timeout} s")
-        self.token = read_token()
-        last = None
-        while time.time() < deadline:
-            if not self.alive():
-                raise InstanceError(f"pid {self.pid} exited while opening {self.fixture}")
-            try:
-                r = self.call("hello")
-            except OSError as e:  # server not answering yet
-                last = e
-                time.sleep(0.5)
-                continue
-            last = r
-            app = r.structured.get("app", {})
-            if app.get("pid") not in (None, self.pid):
-                raise InstanceError(f"port {self.port} belongs to pid {app.get('pid')}, not {self.pid}")
-            if not self.fixture:
-                return
-            score = r.structured.get("score") or {}
-            if score and pathlib.Path(score.get("path", "")).name == self.score_path.name:
-                return
-            time.sleep(1)
-        raise InstanceError(f"{self.fixture and self.fixture.name} did not open within {self.open_timeout} s "
-                            f"(pid {self.pid}, port {self.port}, last hello {str(last)[:200]})")
+    def _claims(self, pid, port):
+        """True if the instance on `port` is `pid` with our score open (or, without a fixture,
+        with no score). False if it is someone else's. None if it cannot tell yet."""
+        try:
+            r = call_tool(port, self.token, "hello", None, rid=1, timeout=10)
+        except OSError:
+            return None
+        if r.structured.get("app", {}).get("pid") not in (None, pid):
+            return False
+        score = r.structured.get("score") or {}
+        if not self.fixture:
+            return not score
+        if not score:
+            return None  # still opening
+        try:
+            return pathlib.Path(score.get("path", "")).resolve() == self.score_path.resolve()
+        except OSError:
+            return False
 
-    def alive(self):
-        if self.pid is None:
+    def _wait_ready(self):
+        """Adopt the new process of our bundle that answers `hello` with our temp score open.
+        Two runs may start at once (PLAN allows two implementers), so a new pid is not ours until
+        it says so; one that has another score open is left alone."""
+        deadline = time.time() + self.open_timeout
+        self.token = read_token()
+        foreign = set()
+        while time.time() < deadline:
+            cands = agent_pids(self.bundle) - self._before - foreign
+            for pid in sorted(cands):
+                port = self._find_port(pid)
+                if port is None:
+                    continue
+                claim = self._claims(pid, port)
+                if claim:
+                    self.pid, self.port = pid, port
+                    return
+                if claim is False:
+                    foreign.add(pid)
+            time.sleep(0.5)
+        raise InstanceError(f"{self.fixture and self.fixture.name} did not open within {self.open_timeout} s "
+                            f"(new pids of this bundle: {sorted(agent_pids(self.bundle) - self._before)}, "
+                            f"others' instances: {sorted(foreign)})")
+
+    def _orphans(self):
+        """After a failed start: new processes of our bundle that never claimed another score.
+        Only these are stopped; the official app and other runs' instances never match."""
+        if not hasattr(self, "_before"):
+            return []
+        out = []
+        for pid in agent_pids(self.bundle) - self._before:
+            port = self._find_port(pid)
+            claim = self._claims(pid, port) if port and self.token else None
+            if claim is not False:
+                out.append(pid)
+        return out
+
+    def alive(self, pid=None):
+        pid = self.pid if pid is None else pid
+        if pid is None:
             return False
         try:
-            os.kill(self.pid, 0)
+            os.kill(pid, 0)
         except ProcessLookupError:
             return False
         except PermissionError:
             return True
         # a zombie is not alive
-        st = subprocess.run(["ps", "-o", "stat=", "-p", str(self.pid)], capture_output=True, text=True).stdout.strip()
+        st = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
         return bool(st) and not st.startswith("Z")
 
     def crash_reports(self):
         """Crash reports macOS wrote for mscore since this instance started."""
         if not CRASH_DIR.exists() or self.started is None:
             return []
-        return sorted(str(p) for p in CRASH_DIR.glob("mscore*")
-                      if p.stat().st_mtime >= self.started - 1)
-
-    def stop(self):
+        import plistlib
+        import re
         try:
-            if self.pid is not None and self.alive():
-                os.kill(self.pid, signal.SIGTERM)
+            with open(self.bundle / "Contents/Info.plist", "rb") as f:
+                bundle_id = plistlib.load(f).get("CFBundleIdentifier")
+        except (OSError, ValueError):
+            bundle_id = None
+        out = []
+        for p in CRASH_DIR.glob("mscore*.ips"):
+            if p.stat().st_mtime < self.started - 1:
+                continue
+            try:
+                text = p.read_text(errors="replace")
+                header = json.loads(text.split("\n", 1)[0])
+            except (OSError, ValueError):
+                continue
+            # the official app writes mscore-*.ips too: only this bundle, and this pid when known
+            if header.get("bundleID") != bundle_id:
+                continue
+            m = re.search(r'"pid"\s*:\s*(\d+)', text)
+            if self.pid is None or (m and int(m.group(1)) == self.pid):
+                out.append(str(p))
+        return sorted(out)
+
+    def _kill(self, pid):
+        try:
+            if self.alive(pid):
+                os.kill(pid, signal.SIGTERM)
                 deadline = time.time() + 20
-                while self.alive() and time.time() < deadline:
+                while self.alive(pid) and time.time() < deadline:
                     time.sleep(0.3)
-                if self.alive():
-                    os.kill(self.pid, signal.SIGKILL)
+                if self.alive(pid):
+                    os.kill(pid, signal.SIGKILL)
                     time.sleep(0.5)
         except ProcessLookupError:
             pass
+
+    def stop(self):
+        try:
+            for pid in ([self.pid] if self.pid is not None else self._orphans()):
+                self._kill(pid)
         finally:
+            self.__dict__.pop("_before", None)  # a second stop() never looks for orphans
             for p in self._exports:
                 try:
                     p.unlink()

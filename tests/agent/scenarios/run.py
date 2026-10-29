@@ -57,19 +57,24 @@ def main():
           f"{'present' if runner.has(a.undo_tool) else 'absent'}")
 
     t0 = time.time()
-    counts = {"ok": 0, "FAIL": 0, "SKIP": 0}
-    failed = []
+    counts = {"ok": 0, "FAIL": 0, "SKIP": 0, "incomplete": 0}
+    failed, partial = [], []
     for s in scenarios:
         r = runner.run(s)
-        status = "FAIL" if r.failed else "SKIP" if r.skipped else "ok"
+        status = "FAIL" if r.failed else "SKIP" if r.skipped else "incomplete" if r.incomplete else "ok"
         counts[status] += 1
         if status == "FAIL":
             failed.append(s["id"])
+        elif status == "incomplete":
+            partial.append(s["id"])
     print()
-    print(f"scenarios: {counts['ok']} ok, {counts['FAIL']} FAIL, {counts['SKIP']} SKIP "
-          f"({time.time() - t0:.0f} s)" + (f"  failed: {' '.join(failed)}" if failed else ""))
-    print("run: " + ("FAIL" if failed else "PASS"))
-    return 1 if failed else 0
+    print(f"scenarios: {counts['ok']} ok, {counts['FAIL']} FAIL, {counts['incomplete']} incomplete, "
+          f"{counts['SKIP']} SKIP ({time.time() - t0:.0f} s)"
+          + (f"  failed: {' '.join(failed)}" if failed else "")
+          + (f"  incomplete: {' '.join(partial)}" if partial else ""))
+    # an incomplete scenario skipped some of its checks: not a pass
+    print("run: " + ("FAIL" if failed else "INCOMPLETE" if partial else "PASS"))
+    return 1 if failed or partial else 0
 
 
 if __name__ == "__main__":

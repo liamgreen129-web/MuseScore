@@ -12,11 +12,13 @@
 import json
 import pathlib
 import re
+import time
 
 from .exports import compare, norm_xml, normalise, zip_members
 from .instance import Instance, InstanceError, find_fixture
 
 UNDO_ALIAS, REDO_ALIAS = "$undo", "$redo"
+TEST_ENV = {"MUSESCORE_AGENT_TEST_COMMANDS": "1"}  # for scenarios with "testCommands": true
 DEFAULT_INVARIANTS = {"validate": True, "undoRedo": True, "format": "mscz", "errorsLeaveScoreUnchanged": True}
 
 
@@ -44,6 +46,12 @@ class Result:
     @property
     def skipped(self):
         return bool(self.lines) and all(s == "SKIP" for s, _, _ in self.lines)
+
+    @property
+    def incomplete(self):
+        """Some checks ran and some were skipped (an undo/redo invariant with no undo tool, say):
+        not a pass, because a gate check would be missing without anyone seeing it."""
+        return not self.failed and not self.skipped and any(s == "SKIP" for s, _, _ in self.lines)
 
 
 # --- scenario files
@@ -155,7 +163,7 @@ _OPS = {
     "eq": lambda v, a: "" if v == a else f"{v!r} != {a!r}",
     "ne": lambda v, a: "" if v != a else f"{v!r} == {a!r}",
     "contains": lambda v, a: "" if v is not _MISSING and a in v else f"{a!r} not in {str(v)[:300]!r}",
-    "notContains": lambda v, a: "" if v is _MISSING or a not in v else f"{a!r} found in {str(v)[:300]!r}",
+    "notContains": lambda v, a: "missing" if v is _MISSING else ("" if a not in v else f"{a!r} found in {str(v)[:300]!r}"),
     "startswith": lambda v, a: "" if isinstance(v, str) and v.startswith(a) else f"{str(v)[:120]!r} does not start with {a!r}",
     "regex": lambda v, a: "" if isinstance(v, str) and re.search(a, v) else f"{str(v)[:200]!r} !~ /{a}/",
     "len": _len,
@@ -202,7 +210,7 @@ class Runner:
 
     def probe(self):
         """Start the build once with no score to learn its tools."""
-        with Instance(bundle=self.bundle) as inst:
+        with Instance(bundle=self.bundle, env=TEST_ENV) as inst:  # test hooks count as available
             self.available = set(inst.tools())
         return self.available
 
@@ -228,14 +236,15 @@ class Runner:
         if fixture is None:
             res.add("FAIL", title, f"fixture {sc['fixture']} not found (corpus: tools/fixtures/make_corpus_fixtures.py)")
             return res
+        env = TEST_ENV if sc.get("testCommands") else None
         try:
-            with Instance(fixture, bundle=self.bundle) as inst:
+            with Instance(fixture, bundle=self.bundle, env=env) as inst:
                 self._run_in(inst, sc, res)
                 if not inst.alive():
                     res.add("FAIL", "instance alive at the end", f"crash reports: {inst.crash_reports()}")
         except InstanceError as e:
             res.add("FAIL", title, f"instance: {e}")
-        except (OSError, KeyError, ValueError) as e:
+        except Exception as e:  # one scenario's surprise (IncompleteRead, TypeError) must not end the run
             res.add("FAIL", title, f"{type(e).__name__}: {e}")
         return res
 
@@ -259,6 +268,9 @@ class Runner:
         idx = idx0
 
         for n, st in enumerate(sc.get("steps", []), 1):
+            if "wait" in st:  # seconds; for asynchronous effects such as playback starting
+                time.sleep(float(st["wait"]))
+                continue
             if "assert" in st:
                 what = st["assert"]
                 label = f"step {n} assert {what}"
@@ -302,7 +314,9 @@ class Runner:
             ok = res.check(label + (" -> error" if want_err else ""), r.is_error == want_err,
                            f"isError={r.is_error}: {r.text[:300]}")
             if ok and st.get("error"):
-                res.check(label + f" error code {st['error']}", r.text.startswith(st["error"]), r.text[:300])
+                # anywhere in the text: batch errors read "step 7 (add_dynamic): E_RANGE: ..."
+                m = re.search(r"\bE_[A-Z_]+", r.text or "")
+                res.check(label + f" error code {st['error']}", bool(m) and m.group(0) == st["error"], r.text[:300])
             for path, spec in (st.get("expect") or {}).items():
                 why = match(get_path(r.structured, path), substitute(spec, env))
                 res.check(f"{label} {path}", not why, why)
@@ -346,6 +360,9 @@ class Runner:
             data = normalise(g["format"], inst.export(g["format"]))
             label = f"golden {g['format']} {g['path']}"
             if self.update_goldens:
+                if res.failed:  # never make a broken score the reference
+                    res.add("FAIL", label + " not written", "the scenario has failures; fix them first")
+                    continue
                 gpath.parent.mkdir(parents=True, exist_ok=True)
                 gpath.write_bytes(data)
                 res.add("ok", label + " written")
