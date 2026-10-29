@@ -77,3 +77,11 @@
 - 2026-10-29 · Handles: EIDs are keyed by object address, so a new object at a freed address inherits a dead object's EID; the "register maps to this object" check is not enough. P2.1 needs a per-type identity fingerprint (read Q3). `itemFromEID` / `EID::fromStdString` assert on bad input, so validate handles before lookup.
 - 2026-10-29 · `stateVersion` = a module-owned counter bumped from `changesChannel`, not the undo index (read + session agree).
 - 2026-10-29 · score_validate cannot call `sanityCheck`/`checkSpanner` as-is (they mutate outside undo); decide at P1.7 between reimplementing read-only or accepting the repair.
+
+## Conductor decisions (2026-10-29, Liam: "use your judgement")
+
+- 2026-10-29 · CLAUDE.md rule 4 reworded: call the engraving-level functions under the UI's wrappers, never wrappers that show dialogs, enter edit modes, reset cmdState or manage the undo lock themselves · all 11 spec sheets found the old "prefer INotationInteraction" rule unworkable.
+- 2026-10-29 · GitHub Actions disabled on the fork (repo setting) · upstream's multi-platform CI is not needed and would run on future pushes/PRs; re-enable in the fork's Settings > Actions if wanted.
+- 2026-10-29 · agent/4.7 pushed to origin (github.com/liamgreen129-web/MuseScore) · needed for the move to the Mac mini; gh login now has the `workflow` scope.
+- 2026-10-29 · G0 manual checks run by the conductor (see G0-checklist.md): separate processes, official quit leaves agent running, second score opens in an agent process, official settings untouched by the agent. Open: agent-quit-with-official-open (blocked by first-launch dialogs), and Muse Sounds.
+- 2026-10-29 · **Correction to PHASE0 §1 / earlier preflight line: Muse Sounds is not installed for MuseScore 4.7 on the MacBook Pro.** 4.7 looks only in `~/Library/Application Support/MuseSampler/lib/` (musesamplerconfiguration.cpp:55, override `MUSESAMPLER_PATH`), which is empty; `/usr/local/lib/libMuseSamplerCoreLib.dylib` (2024) is a leftover the official app doesn't use either. The G0 Muse Sounds check is "same as official" here; the real test moves to the Mac mini.

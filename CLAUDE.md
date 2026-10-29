@@ -49,10 +49,14 @@ accept a subagent's "tests pass": rebuild the canonical tree and rerun everythin
    edits → `unlock()` → `commitChanges()` or `rollbackChanges()`. Notify
    `notationChanged` after commit. Validate before mutating. Check post-conditions,
    because most `INotationInteraction` methods return void.
-4. **Same code paths as the UI.** Prefer `INotationInteraction` / `INotationParts` /
-   `INotationStyle`; drop to `mu::engraving::Score` only where the UI does the same.
-   Never simulate input. Never show dialogs, never call exit, never write outside the
-   agent temp and backup folders.
+4. **Same code paths as the UI, below its wrappers.** Call the engraving-level
+   functions the UI's handlers end up calling (`Score`, `EditData`, `undo*` helpers),
+   as named in `docs/agent/specs/`. Never call a wrapper that shows a dialog
+   (`checkAndShowError`, `MessageBox`), enters text-edit or note-input mode, calls
+   `Score::update()`/`selectAll()`, or locks/unlocks the undo stack or commits itself
+   (`MasterNotationParts`, `NotationStyle` setters, `apply()`). Never simulate input.
+   Never show dialogs, never call exit, never write outside the agent temp and backup
+   folders. (Changed 2026-10-29 from "prefer INotationInteraction"; see DECISIONS.)
 5. **Minimal upstream footprint.** New code lives in `src/agent/`. Changes to upstream
    files are limited to registration lines and the identity patch, each tagged with a
    `// AGENT:` comment so `sync-upstream.sh` conflicts are easy to find.
