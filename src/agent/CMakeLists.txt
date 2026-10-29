@@ -75,6 +75,16 @@ target_sources(agent_lines PRIVATE
 target_include_directories(agent_lines PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(agent_lines PUBLIC agent_core agent_read engraving)
 
+# Expression marks (P2.4): the six write operations, engraving only, so they are unit-tested
+# without the app. Registration (register.cpp) stays in the agent module.
+muse_create_module(agent_marks NO_UNITY)
+target_sources(agent_marks PRIVATE
+    commands/expression-marks/expressionmarks.cpp
+    commands/expression-marks/expressionmarks.h
+)
+target_include_directories(agent_marks PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(agent_marks PUBLIC agent_core agent_read engraving)
+
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 
 target_sources(agent PRIVATE
@@ -107,8 +117,6 @@ target_sources(agent PRIVATE
     commands/session/sessioncommands.h
     commands/test/testcommands.cpp
     commands/test/testcommands.h
-    commands/expression-marks/expressionmarks.cpp
-    commands/expression-marks/expressionmarks.h
     commands/expression-marks/expressionmarkscommands.h
     commands/expression-marks/register.cpp
 
@@ -129,7 +137,7 @@ target_sources(agent PRIVATE
     server/tokenstore.h
 )
 
-target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes agent_lines)
+target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes agent_lines agent_marks)
 
 target_compile_definitions(agent PRIVATE AGENT_BUNDLE_ID="${MUSE_APP_GUI_IDENTIFIER}")
 

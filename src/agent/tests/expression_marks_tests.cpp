@@ -26,9 +26,12 @@
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "engraving/dom/articulation.h"
 #include "engraving/dom/barline.h"
@@ -46,6 +49,7 @@
 #include "engraving/dom/part.h"
 #include "engraving/dom/rest.h"
 #include "engraving/dom/segment.h"
+#include "engraving/dom/select.h"
 #include "engraving/dom/spanner.h"
 #include "engraving/dom/staff.h"
 #include "engraving/dom/tapping.h"
@@ -237,11 +241,24 @@ protected:
         return r;
     }
 
-    //! The op must fail with `e` and leave no undo entry
+    //! The score as saved (.mscx text): what "nothing changed" is compared on
+    std::string snapshot()
+    {
+        const fs::path f = fs::temp_directory_path() / "agent_expression_marks_snapshot.mscx";
+        EXPECT_TRUE(ScoreRW::saveScore(score.get(), muse::String::fromStdString(f.string())));
+        std::ifstream in(f, std::ios::binary);
+        std::string s((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        fs::remove(f);
+        return s;
+    }
+
+    //! The op must fail with `e`, leave no undo entry and leave the saved score byte-identical
     void refused(const Op& op, const Params& p, AErr e, const std::string& contains = {})
     {
+        const std::string saved = snapshot();
         const size_t before = backend->currentIndex();
         const Ret r = run(op, p);
+        EXPECT_EQ(snapshot(), saved) << "a refused request changed the score";
         EXPECT_FALSE(r) << "expected " << errName(e);
         EXPECT_EQ(code(r), err(e)) << r.text();
         if (!contains.empty()) {
@@ -487,8 +504,18 @@ TEST_F(Agent_ExpressionMarks, DynamicVoiceAssignment)
     EXPECT_EQ(dynamicsAt(seg, 0), 1);
     // "preference" follows the configuration (the test mock returns false: this voice only)
     ChordRest* v3 = chordAt(score.get(), 2);
-    ASSERT_TRUE(run(DYN, with(at(score.get(), v3), "dynamic", Val("mp"))));
+    ASSERT_TRUE(run(DYN, with(with(at(score.get(), v3), "dynamic", Val("mp")), "voice_assignment", Val("preference"))));
     EXPECT_EQ(outStr("voiceAssignment"), "this_voice");
+    EXPECT_EQ(dynamicsAt(v3->segment(), v3->track()), 1);
+    // the default is all_voices whatever the app setting (MuseScore's factory default)
+    ChordRest* v4 = find(score.get(), 3, [](ChordRest* c) {
+        return c->isChord() && !c->segment()->findAnnotation(ElementType::DYNAMIC, 0, 3);
+    });
+    ASSERT_TRUE(v4);
+    ASSERT_TRUE(run(DYN, with(at(score.get(), v4), "dynamic", Val("pp"))));
+    EXPECT_EQ(outStr("voiceAssignment"), "all_voices");
+    EXPECT_EQ(dynamicsAt(v4->segment(), 0), 1);
+    EXPECT_EQ(dynamicsAt(v4->segment(), v4->track()), 0);
 }
 
 TEST_F(Agent_ExpressionMarks, DynamicOnGraceMeansMainNote)
@@ -716,8 +743,8 @@ TEST_F(Agent_ExpressionMarks, ArticulationRefusesTappingChord)
         ASSERT_TRUE(tx.commit());
     }
     ASSERT_TRUE(ch->tapping());
-    refused(ART, with(at(score.get(), c), "articulation", Val("up_bow")), AErr::InvalidArg, "tapping");
-    refused(ORN, with(at(score.get(), c), "ornament", Val("mordent")), AErr::InvalidArg, "tapping");
+    refused(ART, with(at(score.get(), c), "articulation", Val("up_bow")), AErr::Refused, "tapping");
+    refused(ORN, with(at(score.get(), c), "ornament", Val("mordent")), AErr::Refused, "tapping");
     EXPECT_TRUE(ch->tapping());
 }
 
@@ -908,4 +935,254 @@ TEST_F(Agent_ExpressionMarks, BreathAfterLastNoteOfBarAndGrace)
     Params p;
     p["target"] = Val(makeHandle(toChord(main)->graceNotes().front()));
     refused(BR, p, AErr::InvalidArg, "grace");
+}
+
+// ================================================================== additions from the P2.4 review
+
+namespace {
+int hairpinsIn(const Score* s)
+{
+    int n = 0;
+    for (const auto& [tick, sp] : s->spanner()) {
+        n += sp->isHairpin();
+    }
+    return n;
+}
+
+int breathsIn(const Score* s)
+{
+    int n = 0;
+    for (const Segment* seg = s->firstSegment(SegmentType::Breath); seg; seg = seg->next1(SegmentType::Breath)) {
+        for (track_idx_t t = 0; t < s->ntracks(); ++t) {
+            n += seg->element(t) && seg->element(t)->isBreath();
+        }
+    }
+    return n;
+}
+
+//! hairpins / breaths in each part score, in excerpt order
+std::vector<int> perPart(MasterScore* score, int (*count)(const Score*))
+{
+    std::vector<int> v;
+    for (Excerpt* ex : score->excerpts()) {
+        v.push_back(ex->excerptScore() ? count(ex->excerptScore()) : -1);
+    }
+    return v;
+}
+}
+
+TEST_F(Agent_ExpressionMarks, MeasureRepeatRefused)
+{
+    {
+        Transaction tx(score.get(), *backend);
+        ASSERT_TRUE(tx.begin("setup"));
+        ASSERT_TRUE(tx.step("repeat", [&] {
+            // empty the bar first, or cmdAddMeasureRepeat asks with a MessageBox (cmd.cpp:3877)
+            Measure* m2 = bar(score.get(), 2);
+            score->deleteRange(m2->first(SegmentType::ChordRest), m2->nextMeasure()->first(SegmentType::ChordRest), 0, VOICES,
+                               SelectionFilter(), false);
+            score->cmdAddMeasureRepeat(m2, 1, 0);
+            return muse::make_ok();
+        }));
+        ASSERT_TRUE(tx.commit());
+    }
+    ChordRest* mr = toChordRest(bar(score.get(), 2)->first(SegmentType::ChordRest)->element(0));
+    ASSERT_TRUE(mr && mr->isMeasureRepeat());
+    Params p;
+    p["staff"] = staffNo(1);
+    p["at"] = posBeat(2, 1);
+    refused(DYN, with(p, "dynamic", Val("p")), AErr::InvalidArg, "measure repeat");
+    refused(ART, with(p, "articulation", Val("accent")), AErr::InvalidArg, "measure repeat");
+    refused(FER, p, AErr::InvalidArg, "measure repeat");
+    Params b;
+    b["staff"] = staffNo(1);
+    b["after"] = posBeat(2, 1);
+    refused(BR, b, AErr::InvalidArg, "measure repeat");
+    Params h;
+    h["kind"] = Val("cresc");
+    h["staff"] = staffNo(1);
+    h["from"] = posBeat(1, 1);
+    h["to"] = posBeat(2, 1);
+    refused(HP, h, AErr::InvalidArg, "measure repeat");
+}
+
+TEST_F(Agent_ExpressionMarks, SpanWithOnlyRestsRefused)
+{
+    open("voices-four.mscz");
+    ChordRest* rest = restAt(score.get(), 3);
+    ASSERT_TRUE(rest);
+    Params p = with(at(score.get(), rest), "articulation", Val("staccato"));
+    p["through"] = pos(score.get(), rest);
+    refused(ART, p, AErr::InvalidArg, "there are no notes from");
+    Params o = with(at(score.get(), rest), "ornament", Val("mordent"));
+    o["through"] = pos(score.get(), rest);
+    refused(ORN, o, AErr::InvalidArg, "there are no notes from");
+}
+
+TEST_F(Agent_ExpressionMarks, FermataNoEndBarline)
+{
+    // a bar without its end-barline segment (removed directly, as fixture set-up)
+    Measure* m = bar(score.get(), 1);
+    Segment* s = m->findSegment(SegmentType::EndBarLine, m->endTick());
+    ASSERT_TRUE(s);
+    m->segments().remove(s);
+    Params bl;
+    bl["staff"] = staffNo(1);
+    bl["barline"] = Val(1);
+    refused(FER, bl, AErr::Range, "has no end barline");
+}
+
+TEST_F(Agent_ExpressionMarks, FermataAllStavesErrors)
+{
+    open("voices-four.mscz");
+    // voice 4 holds a whole note in bar 1: nothing starts at beat 2 in that voice on any staff
+    Params all;
+    all["all_staves"] = Val(true);
+    all["at"] = posBeat(1, 2);
+    all["voice"] = Val(4);
+    refused(FER, all, AErr::Range, "no staff has");
+    Params bl;
+    bl["barline"] = Val(1);
+    bl["all_staves"] = Val(true);
+    bl["staff"] = staffNo(1);
+    refused(FER, bl, AErr::InvalidArg, "leave out staff");
+}
+
+TEST_F(Agent_ExpressionMarks, HairpinToWithoutNote)
+{
+    open("voices-four.mscz");
+    Params h;
+    h["kind"] = Val("dim");
+    h["staff"] = staffNo(1);
+    h["voice"] = Val(4);
+    h["from"] = posBeat(1, 1);
+    h["to"] = posBeat(1, 2);
+    refused(HP, h, AErr::Range, "no note or rest starts");
+}
+
+TEST_F(Agent_ExpressionMarks, HairpinEndStopsAtDynamic)
+{
+    open("voices-four.mscz");
+    // voice 4 holds a whole note in bar 1; a voice-4 dynamic inside it (at voice 1's second
+    // event) cuts a hairpin over that note short there (edit.cpp:4389-4396)
+    ChordRest* whole = toChordRest(bar(score.get(), 1)->first(SegmentType::ChordRest)->element(3));
+    ASSERT_TRUE(whole && whole->isChord());
+    ChordRest* inside = chordAt(score.get(), 0, 1);
+    ASSERT_TRUE(inside && inside->tick() > whole->tick() && inside->tick() < whole->endTick());
+    {
+        Transaction tx(score.get(), *backend);
+        ASSERT_TRUE(tx.begin("setup"));
+        ASSERT_TRUE(tx.step("dynamic", [&] {
+            Dynamic* d = Factory::createDynamic(score->dummy()->segment());
+            d->setDynamicType(u"f");
+            d->setTrack(3);
+            d->setProperty(Pid::VOICE_ASSIGNMENT, VoiceAssignment::CURRENT_VOICE_ONLY);
+            d->setParent(inside->segment());
+            score->undoAddElement(d);
+            return muse::make_ok();
+        }));
+        ASSERT_TRUE(tx.commit());
+    }
+    Params h;
+    h["kind"] = Val("cresc");
+    h["staff"] = staffNo(1);
+    h["voice"] = Val(4);
+    h["from"] = pos(score.get(), whole);
+    h["to"] = pos(score.get(), whole);
+    h["voice_assignment"] = Val("this_voice");
+    ASSERT_TRUE(run(HP, h));
+    bool found = false;
+    for (const auto& [tick, sp] : score->spanner()) {
+        if (sp->isHairpin() && sp->track() == 3) {
+            EXPECT_EQ(sp->tick2(), inside->tick());
+            found = true;
+        }
+    }
+    EXPECT_TRUE(found);
+    // a second hairpin over the same note overlaps the (shortened) first one
+    refused(HP, with(h, "kind", Val("dim")), AErr::Exists, "already covers");
+}
+
+TEST_F(Agent_ExpressionMarks, ArticulationSpanUndoRedo)
+{
+    ChordRest* a = chordAt(score.get(), 0);
+    ChordRest* b = chordAt(score.get(), 0, 2);
+    Params p = with(at(score.get(), a), "articulation", Val("marcato"));
+    p["through"] = pos(score.get(), b);
+    auto count = [&] {
+        int n = 0;
+        for (int i = 0; i < 3; ++i) {
+            n += static_cast<int>(toChord(chordAt(score.get(), 0, i))->articulations().size());
+        }
+        return n;
+    };
+    addsOneEntry(ART, p, [&] { EXPECT_EQ(count(), 3); }, [&] { EXPECT_EQ(count(), 0); });
+    EXPECT_EQ(out.at("added").toInt(), 3);
+}
+
+TEST_F(Agent_ExpressionMarks, OrnamentOnGraceUndoRedo)
+{
+    open("grace-notes.mscz");
+    ChordRest* main = find(score.get(), 0, [](ChordRest* cr) { return cr->isChord() && !toChord(cr)->graceNotes().empty(); });
+    ASSERT_TRUE(main);
+    Chord* grace = toChord(main)->graceNotes().front();
+    Params p;
+    p["target"] = Val(makeHandle(grace));
+    p["ornament"] = Val("turn");
+    addsOneEntry(ORN, p, [&] {
+        ASSERT_EQ(grace->articulations().size(), 1u);
+        EXPECT_EQ(grace->articulations().front()->symId(), SymId::ornamentTurn);
+    }, [&] { EXPECT_TRUE(grace->articulations().empty()); });
+}
+
+TEST_F(Agent_ExpressionMarks, HairpinInLinkedParts)
+{
+    open("parts-linked.mscz");
+    ASSERT_FALSE(score->excerpts().empty());
+    ChordRest* a = chordAt(score.get(), 0, 1);
+    ChordRest* b = chordAt(score.get(), 0, 2);
+    const std::vector<int> before = perPart(score.get(), hairpinsIn);
+    const int master = hairpinsIn(score.get());
+    Params h;
+    h["kind"] = Val("dim");
+    h["staff"] = staffNo(1);
+    h["from"] = pos(score.get(), a);
+    h["to"] = pos(score.get(), b);
+    addsOneEntry(HP, h,
+                 [&] {
+        EXPECT_EQ(hairpinsIn(score.get()), master + 1);
+        const std::vector<int> now = perPart(score.get(), hairpinsIn);
+        int added = 0;
+        for (size_t i = 0; i < now.size(); ++i) {
+            EXPECT_GE(now[i], before[i]);
+            added += now[i] - before[i];
+        }
+        EXPECT_EQ(added, 2) << "a copy in the Flute part and in the Flute and Clarinet part";
+    },
+                 [&] {
+        EXPECT_EQ(hairpinsIn(score.get()), master);
+        EXPECT_EQ(perPart(score.get(), hairpinsIn), before);
+    });
+}
+
+TEST_F(Agent_ExpressionMarks, BreathInLinkedParts)
+{
+    open("parts-linked.mscz");
+    ChordRest* a = chordAt(score.get(), 0, 1);
+    const std::vector<int> before = perPart(score.get(), breathsIn);
+    const int master = breathsIn(score.get());
+    addsOneEntry(BR, at(score.get(), a, "after"),
+                 [&] {
+        EXPECT_EQ(breathsIn(score.get()), master + 1);
+        const std::vector<int> now = perPart(score.get(), breathsIn);
+        int added = 0;
+        for (size_t i = 0; i < now.size(); ++i) {
+            added += now[i] - before[i];
+        }
+        EXPECT_EQ(added, 2) << "a copy in the Flute part and in the Flute and Clarinet part";
+    },
+                 [&] {
+        EXPECT_EQ(breathsIn(score.get()), master);
+        EXPECT_EQ(perPart(score.get(), breathsIn), before);
+    });
 }

@@ -575,6 +575,83 @@ bool contains(const std::vector<EngravingItem*>& v, const EngravingItem* e)
 {
     return std::find(v.begin(), v.end(), e) != v.end();
 }
+
+//! Where Score::addHairpin(Hairpin*, cr1, cr2) ends a hairpin with no range selected
+//! (edit.cpp:4383-4398): the end of cr2 (or of cr1 and its ties), cut short at the first
+//! dynamic on cr1's track inside the last note
+Fraction hairpinEnd(const ChordRest* cr1, const ChordRest* cr2)
+{
+    const track_idx_t track = cr1->track();
+    Fraction endTick;
+    if (cr2 && cr2 != cr1) {
+        endTick = cr2->endTick();
+    } else {
+        endTick = cr1->isChord() ? toChord(cr1)->endTickIncludingTied() : cr1->endTick();
+    }
+    const Segment* startSegment = cr2 ? cr2->segment() : cr1->segment();
+    for (const Segment* seg = startSegment; seg && seg->tick() < endTick; seg = seg->next1(Segment::CHORD_REST_OR_TIME_TICK_TYPE)) {
+        if (seg == startSegment) {
+            continue;
+        }
+        if (seg->findAnnotation(ElementType::DYNAMIC, track, track)) {
+            return seg->tick();
+        }
+    }
+    return endTick;
+}
+
+//! How many copies (the element included) Score::undoAddElement makes of e on its staff and
+//! the staves linked to it (edit.cpp:6957-7036): one per linked staff with a linked voice; for
+//! voice-1 dynamics and hairpins also where that voice is not linked; dynamics only on the
+//! linked staves that stand for the same staff of the part (rstaff).
+size_t expectedCopies(const EngravingItem* e)
+{
+    const Staff* ostaff = e->staff();
+    const track_idx_t strack = e->track();
+    size_t n = 0;
+    for (const Staff* st : ostaff->staffList()) {
+        if (ostaff->getLinkedTrackInStaff(st, strack) == muse::nidx
+            && !(track2voice(strack) == 0 && (e->isDynamic() || e->isHairpin()))) {
+            continue;
+        }
+        if (st != ostaff && e->isDynamic() && st->rstaff() != ostaff->rstaff()) {
+            continue;
+        }
+        ++n;
+    }
+    return n;
+}
+
+//! Post-condition for linked parts: the expected number of linked copies exist, and each one
+//! is in its own score where it belongs (segment annotation, spanner map, breath slot).
+Ret linkedCopiesPresent(const EngravingItem* e, const std::string& what)
+{
+    const std::list<EngravingObject*> links = e->linkList();
+    const size_t want = expectedCopies(e);
+    if (links.size() != want) {
+        return core::expect(false, what + " has " + std::to_string(links.size()) + " copies in the score and its parts, expected "
+                            + std::to_string(want));
+    }
+    for (EngravingObject* o : links) {
+        if (o == e) {
+            continue;
+        }
+        const EngravingItem* c = toEngravingItem(o);
+        bool placed = false;
+        if (c->isHairpin()) {
+            for (const auto& [tick, sp] : c->score()->spanner()) {
+                placed = placed || sp == c;
+            }
+        } else if (c->explicitParent() && c->explicitParent()->isSegment()) {
+            const Segment* seg = toSegment(c->explicitParent());
+            placed = c->isBreath() ? seg->element(c->track()) == c : contains(seg->annotations(), c);
+        }
+        if (!placed) {
+            return core::expect(false, "a linked copy of " + what + " is not in its part");
+        }
+    }
+    return muse::make_ok();
+}
 }
 
 // ================================================================== names
@@ -652,7 +729,7 @@ Ret mu::agent::expression_marks::addDynamic(const Params& p, MasterScore* score,
         }
         xml = TextBase::plainToXmlText(String::fromStdString(text));
     }
-    const std::string mode = str(p, "voice_assignment", "preference");
+    const std::string mode = str(p, "voice_assignment", "all_voices");
     const std::string ifExists = str(p, "if_exists", "replace");
     const bool hasVelocity = has(p, "velocity");
     const int velocity = hasVelocity ? p.at("velocity").toInt() : -1;
@@ -721,6 +798,11 @@ Ret mu::agent::expression_marks::addDynamic(const Params& p, MasterScore* score,
                              "the dynamic at " + where(score, cr) + " is not the one requested"); !r) {
         return r;
     }
+    if (status == "added") {
+        if (Ret r = linkedCopiesPresent(result, "the dynamic at " + where(score, cr)); !r) {
+            return r;
+        }
+    }
 
     const int bar = barOf(score, cr->measure());
     out["handle"] = Val(core::makeHandle(result));
@@ -772,12 +854,18 @@ Ret mu::agent::expression_marks::addHairpin(const Params& p, MasterScore* score,
     if (Ret r = chordRestAt(score, m2, t2, track, cr2); !r) {
         return r;
     }
+    if (Ret r = refuseMeasureRepeat(score, cr1); !r) {
+        return r;
+    }
+    if (Ret r = refuseMeasureRepeat(score, cr2); !r) {
+        return r;
+    }
     if (cr2->tick() < cr1->tick()) {
         // proposed E_EMPTY_SPAN (spec M10)
         return makeErr(Err::InvalidArg, "'to' (" + where(score, cr2) + ") is before 'from' (" + where(score, cr1)
                        + "); a hairpin runs from its first note to its last");
     }
-    const std::string mode = str(p, "voice_assignment", "preference");
+    const std::string mode = str(p, "voice_assignment", "all_voices");
 
     // the hairpin, with type, line texts (edit.cpp:4338-4346) and voice assignment set before it
     // is added, so linked clones get them too
@@ -794,13 +882,12 @@ Ret mu::agent::expression_marks::addHairpin(const Params& p, MasterScore* score,
     const VoiceAssignment va = h->voiceAssignment();
     const track_idx_t finalTrack = h->track();
 
-    // spec Q5: overlapping hairpins on one track are refused
+    // spec Q5: overlapping hairpins on one track are refused (with the end the add will use)
     const Fraction start = cr1->tick();
-    const Fraction endGuess = (cr2 != cr1) ? cr2->endTick()
-                              : (cr1->isChord() ? toChord(cr1)->endTickIncludingTied() : cr1->endTick());
-    for (const auto& iv : score->spannerMap().findOverlapping(start.ticks(), endGuess.ticks())) {
+    const Fraction end = hairpinEnd(cr1, cr2);
+    for (const auto& iv : score->spannerMap().findOverlapping(start.ticks(), end.ticks())) {
         const Spanner* sp = iv.value;
-        if (sp->isHairpin() && sp->track() == finalTrack && sp->tick() < endGuess && sp->tick2() > start) {
+        if (sp->isHairpin() && sp->track() == finalTrack && sp->tick() < end && sp->tick2() > start) {
             return makeErr(Err::Exists, "a hairpin already covers part of that span on this staff and voice ("
                            + core::makeHandle(sp) + "); remove it first or start this one where it ends");
         }
@@ -811,8 +898,14 @@ Ret mu::agent::expression_marks::addHairpin(const Params& p, MasterScore* score,
     score->deselectAll();
     Hairpin* hp = h.release();
     score->addHairpin(hp, cr1, cr2);
+    // the add makes the linked copies on cr1's voice: check them before the move below
+    if (Ret r = linkedCopiesPresent(hp, "the hairpin from " + where(score, cr1)); !r) {
+        return r;
+    }
     if (va == VoiceAssignment::ALL_VOICE_IN_INSTRUMENT && hp->voice() != 0) {
-        // edit.cpp:4325-4327: an all-voices hairpin moves to voice 1 (master only, as in the UI)
+        // edit.cpp:4325-4327: an all-voices hairpin moves to voice 1, as in the UI. Only the
+        // master moves (a plain setTrack, not undoable): the part copies keep cr1's voice track;
+        // only the voice assignment, set before the add, reached them.
         hp->setTrack(trackZeroVoice(hp->track()));
     }
 
@@ -821,7 +914,7 @@ Ret mu::agent::expression_marks::addHairpin(const Params& p, MasterScore* score,
     for (const auto& iv : score->spannerMap().findOverlapping(hp->tick().ticks(), hp->tick2().ticks())) {
         found = found || iv.value == hp;
     }
-    if (Ret r = core::expect(found && hp->tick() == start && hp->tick2() > hp->tick() && hp->track() == finalTrack
+    if (Ret r = core::expect(found && hp->tick() == start && hp->tick2() == end && hp->tick2() > hp->tick() && hp->track() == finalTrack
                              && hp->hairpinType() == type, "the hairpin was not added from " + where(score, cr1)); !r) {
         return r;
     }
@@ -921,7 +1014,7 @@ Ret addChordMarks(const Params& p, MasterScore* score, mu::agent::expression_mar
     for (Chord* c : chords) {
         if (c->tapping() && !c->hasArticulation(probe.get())) {
             // spec Q8: Score::toggleArticulation removes a tapping when anything else is added (cmd.cpp:2459-2464)
-            return makeErr(Err::InvalidArg, where(score, c) + " has a tapping mark, which MuseScore would remove "
+            return makeErr(Err::Refused, where(score, c) + " has a tapping mark, which MuseScore would remove "
                            "when another mark is added; remove the tapping first if that is what you want");
         }
     }
@@ -1216,6 +1309,11 @@ Ret mu::agent::expression_marks::addBreath(const Params& p, MasterScore* score, 
     if (Ret r = core::expect(now && now->isBreath() && toBreath(now)->symId() == sym && toBreath(now)->pause() == pause,
                              "no breath mark after " + where(score, cr) + " afterwards"); !r) {
         return r;
+    }
+    if (status == "added") {
+        if (Ret r = linkedCopiesPresent(now, "the breath mark after " + where(score, cr)); !r) {
+            return r;
+        }
     }
 
     const int bar = barOf(score, m);

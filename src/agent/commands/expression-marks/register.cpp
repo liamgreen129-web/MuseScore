@@ -38,8 +38,8 @@ const char* TARGET_DESC
     = "Instead of staff + position (+ voice): a Note, Chord or Rest handle from score_read detail (a note means its chord)";
 const char* VOICE_DESC = "Voice 1-4 (default 1)";
 const char* VA_DESC
-    = "Which voices it applies to: preference (MuseScore's 'dynamics apply to all voices' setting, as the palette does), "
-      "all_voices, or this_voice";
+    = "Which voices it applies to: all_voices (default; MuseScore's factory setting), this_voice, or preference "
+      "(follow this MuseScore's 'dynamics apply to all voices' setting, as the palette does)";
 const char* NOTATION_DESC = "The touched bars of that staff in the compact notation, after the edit";
 
 Arg arg(DataType t, const std::string& d, bool required = false)
@@ -95,7 +95,9 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
               "Dynamics palette does. Address it with staff + at (+ voice), or with target (a handle). Give dynamic (a "
               "name) or text (e.g. \"subito p\": plain text that must contain a dynamic; words alone such as \"dolce\" "
               "are refused, use add_text kind expression). If that slot already has a dynamic, if_exists replace "
-              "(default) changes its type and text in place, error refuses with E_EXISTS. A grace note means its main "
+              "(default) changes its type and text in place (keeping its voice assignment: voice_assignment is "
+              "ignored then), error refuses with E_EXISTS. The slot is the voice the dynamic lands in: voice 1 for "
+              "all_voices (the default), the given voice for this_voice. A grace note means its main "
               "note. Refuses (E_RANGE) when no note or rest starts exactly at the position. Returns the dynamic's "
               "handle, status (added, replaced or unchanged) and the bar's notation.";
         c.kind = CommandKind::Write;
@@ -159,7 +161,7 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
               "articulation is left alone (counted as unchanged). With through, every chord from at through that "
               "position on the staff and voice gets one (rests are skipped). A combined mark such as accent_staccato is "
               "stored as one symbol on a chord with no marks, and as its parts on a chord that has some. Refuses a rest "
-              "(E_INVALID_ARG) and a chord with a tapping mark, which MuseScore would remove. Returns handles, counts "
+              "(E_INVALID_ARG) and a chord with a tapping mark, which MuseScore would remove (E_REFUSED). Returns handles, counts "
               "and the notation of the bars.";
         c.kind = CommandKind::Write;
         c.undoName = "Add articulation";
@@ -185,8 +187,8 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
             = "Adds an ornament symbol (trill, mordent, turn, ...; the notation codes tr, mord, imord, turn, iturn work "
               "too) to a chord, as the Ornaments palette does: it adds and never removes; a chord that already has it is "
               "left alone. trill is the tr symbol on one note, not a trill line (that is add_line). With through, every "
-              "chord from at through that position gets one. Refuses a rest and a chord with a tapping mark "
-              "(E_INVALID_ARG). Returns handles, counts and the notation of the bars.";
+              "chord from at through that position gets one. Refuses a rest (E_INVALID_ARG) and a chord with a tapping "
+              "mark (E_REFUSED). Returns handles, counts and the notation of the bars.";
         c.kind = CommandKind::Write;
         c.undoName = "Add ornament";
         c.input["ornament"] = enumArg("Which ornament", em::ornamentNames(), true);

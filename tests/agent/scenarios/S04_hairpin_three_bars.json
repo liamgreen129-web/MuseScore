@@ -43,10 +43,10 @@
               "contains": "m1 v1 | E5:q+< G5:q A5:q G5:q"
             },
             {
-              "contains": "m3 v1 | E5:q D5:q C5:q A4:q\n"
+              "contains": "m3 v1 | E5:q D5:q C5:q A4:q+!"
             },
             {
-              "contains": "m4 v1 | D5:q+! F5:q G5:q B4:q"
+              "contains": "m4 v1 | D5:q F5:q G5:q B4:q"
             }
           ]
         }
@@ -83,7 +83,7 @@
     "undoRedo": true
   },
   "questions": [
-    "add_hairpin 'to' is the last note under the hairpin (inclusive); the hairpin ends at that note's end tick (edit.cpp:4385). P2.4 run: score_read prints `!` on the event AT the end tick (m4 beat 1, Spanner::endElement), not on the last note under the hairpin. Expectation follows the printer; whether NOTATION.md `!` should mean the last covered note is for the conductor.",
+    "printer fixed 2026-10-29",
     "expression-marks.md lists E_EMPTY_SPAN for end <= start; P2.4 returns E_INVALID_ARG until the conductor adds E_EMPTY_SPAN to errors.h."
   ]
 }
