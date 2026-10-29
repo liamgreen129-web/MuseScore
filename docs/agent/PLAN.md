@@ -79,7 +79,7 @@ test the conductor can run. Single-threaded everywhere else.
 | P1.3 | Write `NOTATION.md`: the compact notation grammar, with worked examples from Liam's own repertoire. **STOP: Liam reviews the notation** | Conductor | P0.S |
 | P1.4 | Printer (score → notation) and parser (notation → model), unit tests | Conductor | P1.3 approved |
 | P1.5 | ∥ Synthetic stress fixtures (every tuplet ratio, nested tuplets, 4 voices, cross-staff, linked parts, lyrics with melismas, grace notes, pickups, irregular bars) | `fixture-builder` | P0.7 |
-| P1.6 | Liam supplies 10–20 real scores into `tests/fixtures/real/` (git-ignored). **STOP until provided** | Liam | — |
+| P1.6 | 10–20 real scores: public-domain corpus set via `tools/fixtures/make_corpus_fixtures.py` into `tests/fixtures/corpus/`; Liam's own scores optional in `tests/fixtures/real/` (both git-ignored). Changed 2026-10-29, see DECISIONS | Conductor | — |
 | P1.7 | `score_overview`, `score_read`, `score_export`, `score_render`, `score_changes`, `score_validate` | Conductor | P1.4 |
 | P1.8 | Gate G1 run. **STOP: G1 sign-off** | Conductor + Liam | P1.5–P1.7 |
 
