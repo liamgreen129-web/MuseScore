@@ -1,0 +1,44 @@
+{
+  "id": "N01",
+  "title": "clear_range: voice 2 of two bars, then beats across staves",
+  "source": "specs/notes.md NOTES-CR-01, NOTES-CR-03",
+  "fixture": "synthetic/voices-four.mscz",
+  "specs": ["specs/notes.md clear_range"],
+  "steps": [
+    {
+      "tool": "clear_range",
+      "writes": true,
+      "args": {"staves": [1], "from": {"measure": 1}, "to": {"measure": 2}, "voices": [2]},
+      "expect": {"bars": "1-2", "text": {"notContains": " v2 |"}}
+    },
+    {
+      "tool": "score_read",
+      "args": {"from": 1, "to": 2, "staves": [1]},
+      "expect": {"text": {"all": [
+        {"contains": "m1 v1 | E6:e D6:e C6:e D6:e E6:e G6:e E6:e D6:e"},
+        {"contains": "m1 v3 | E5:h D5:h"},
+        {"notContains": " v2 |"}
+      ]}},
+      "note": "voice 2 gone, other voices untouched"
+    },
+    {
+      "tool": "clear_range",
+      "writes": true,
+      "args": {"staves": [1], "from": {"measure": 4, "beat": 1}, "to": {"measure": 4, "beat": 3}, "voices": [1]}
+    },
+    {
+      "tool": "clear_range",
+      "args": {"staves": [1], "from": {"measure": 1, "beat": 1.5}, "to": {"measure": 1}},
+      "error": "E_RANGE",
+      "text": {"contains": "nothing starts"}
+    },
+    {
+      "tool": "clear_range",
+      "args": {"staves": [1], "from": {"measure": 1}, "to": {"measure": 1}, "include": ["noise"]},
+      "error": "E_INVALID_ARG"
+    },
+    {"assert": "undoIndex", "delta": 2}
+  ],
+  "goldens": [{"format": "musicxml", "path": "goldens/N01_clear_range.musicxml"}],
+  "invariants": {"validate": true, "undoRedo": true}
+}

@@ -44,11 +44,13 @@ target_link_libraries(agent_core PUBLIC engraving)
 # Notes and rhythm (P2.3): write_voice's engine, engraving-level and unit-tested without the app.
 muse_create_module(agent_notes NO_UNITY)
 target_sources(agent_notes PRIVATE
+    commands/notes/clearrange.cpp
+    commands/notes/clearrange.h
     commands/notes/writevoice.cpp
     commands/notes/writevoice.h
 )
 target_include_directories(agent_notes PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(agent_notes PUBLIC agent_read agent_notation engraving)
+target_link_libraries(agent_notes PUBLIC agent_core agent_read agent_notation engraving)
 
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 

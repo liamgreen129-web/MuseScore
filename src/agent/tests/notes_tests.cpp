@@ -33,7 +33,9 @@
 #include "engraving/editing/undo.h"
 #include "engraving/tests/utils/scorerw.h"
 
+#include "commands/notes/clearrange.h"
 #include "commands/notes/writevoice.h"
+#include "engraving/dom/selectionfilter.h"
 #include "core/transaction.h"
 #include "core/undobackend.h"
 #include "notation/parser.h"
@@ -437,4 +439,142 @@ TEST_F(Agent_WriteVoice, KeepsAnnotations)
     ASSERT_TRUE(o.ret) << o.ret.text();
     t = print(s.get(), 1, 3, 3);
     EXPECT_FALSE(has(t, "m3 h |")) << t;
+}
+
+// --- clear_range (NOTES-CR-xx)
+
+namespace {
+Outcome runClear(MasterScore* score, const ClearRangeArgs& a, ClearRangeResult* out = nullptr)
+{
+    MScore::setError(MsError::MS_NO_ERROR);
+    core::ScoreUndoBackend backend(score);
+    core::Transaction tx(score, backend);
+    Outcome o;
+    o.ret = tx.begin("Agent: Clear range");
+    ClearRangeResult r;
+    if (o.ret) {
+        o.ret = tx.step("clear_range", [&] { return clearRange(score, a, r); });
+    }
+    if (o.ret) {
+        o.ret = tx.commit();
+        o.changed = tx.changed();
+    }
+    if (out) {
+        *out = r;
+    }
+    return o;
+}
+
+ClearRangeArgs bars(int s1, int s2, int from, int to)
+{
+    ClearRangeArgs a;
+    a.staffFrom = s1;
+    a.staffTo = s2;
+    a.from.bar = from;
+    a.to.bar = to;
+    return a;
+}
+}
+
+// CR-01: clear voice 2 in two bars: it disappears, voice 1 untouched; one undo restores
+TEST_F(Agent_WriteVoice, ClearVoiceTwo)
+{
+    auto s = open("voices-four.mscz");
+    const std::string before = print(s.get(), 1);
+    ClearRangeArgs a = bars(1, 1, 1, 2);
+    a.voices = { 2 };
+    ClearRangeResult r;
+    Outcome o = runClear(s.get(), a, &r);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(o.changed);
+    const std::string t = print(s.get(), 1, 1, 2);
+    EXPECT_FALSE(has(t, " v2 |")) << t;
+    EXPECT_TRUE(has(t, "m1 v1 | E6:e D6:e C6:e D6:e E6:e G6:e E6:e D6:e\n")) << t;
+    EXPECT_TRUE(has(t, "m1 v3 | E5:h D5:h\n")) << t;
+    EXPECT_EQ(r.fromBar, 1);
+    EXPECT_EQ(r.toBar, 2);
+    undo(s.get());
+    EXPECT_EQ(print(s.get(), 1), before);
+}
+
+// CR-02: clear voice 1 keeping chord symbols; the user's own selection filter is neither used nor changed
+TEST_F(Agent_WriteVoice, ClearKeepsExcludedTypesAndIgnoresUserFilter)
+{
+    auto s = open("chord-symbols.mscz");
+    s->selectionFilter().setFiltered(VoicesSelectionFilterTypes::FIRST_VOICE, false); // the user's filter
+    const SelectionFilter userFilter = s->selectionFilter();
+    ClearRangeArgs a = bars(1, 1, 1, 2);
+    a.include = { "slurs", "ties", "articulations", "lyrics" };
+    Outcome o = runClear(s.get(), a);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(s->selectionFilter() == userFilter);
+    const std::string t = print(s.get(), 1, 1, 2);
+    EXPECT_TRUE(has(t, "m1 v1 | R\n")) << t;
+    EXPECT_TRUE(has(t, "m1 h | {C}:h {Am7}:h\n")) << t;
+    EXPECT_TRUE(has(t, "m2 h | {Dm7}:h {G7}:h\n")) << t;
+
+    o = runClear(s.get(), bars(1, 1, 3, 3)); // default: everything goes
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_FALSE(has(print(s.get(), 1, 3, 3), "m3 h |")) << print(s.get(), 1, 3, 3);
+}
+
+// CR-03: beats 2-3 of one bar across two staves
+TEST_F(Agent_WriteVoice, ClearBeatsAcrossStaves)
+{
+    auto s = open("transposing-instruments.mscz");
+    ClearRangeArgs a = bars(1, 2, 1, 1);
+    a.from.beat = 2;
+    a.from.hasBeat = true;
+    a.to.beat = 4;
+    a.to.hasBeat = true;
+    Outcome o = runClear(s.get(), a);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    for (int staff : { 1, 2 }) {
+        const std::string t = print(s.get(), staff, 1, 1);
+        EXPECT_TRUE(has(t, "m1 v1 | C4:q r:") && has(t, " F4:q\n")) << t;
+        EXPECT_FALSE(has(t, "D4") || has(t, "E4")) << t;
+    }
+    EXPECT_TRUE(has(print(s.get(), 3, 1, 1), "m1 v1 | C4:q D4:q E4:q F4:q\n")) << print(s.get(), 3, 1, 1);
+}
+
+// CR-04: a range cutting through a nested tuplet is cleared the UI's way and still adds up
+TEST_F(Agent_WriteVoice, ClearCutsTuplet)
+{
+    auto s = open("tuplets-nested.mscz");
+    ClearRangeArgs a = bars(1, 1, 1, 1);
+    a.to.beat = 3;
+    a.to.hasBeat = true;
+    Outcome o = runClear(s.get(), a);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_FALSE(has(print(s.get(), 1, 1, 1), "C5") || has(print(s.get(), 1, 1, 1), "D5")) << print(s.get(), 1, 1, 1);
+}
+
+TEST_F(Agent_WriteVoice, ClearRefusesBeforeChangingAnything)
+{
+    auto s = open("pickup-bar.mscz");
+    const std::string before = print(s.get(), 1);
+    const size_t idx = s->undoStack()->currentIndex();
+    struct Case {
+        ClearRangeArgs a;
+        std::string expect;
+    };
+    std::vector<Case> cases;
+    cases.push_back({ bars(1, 2, 1, 1), "within 1-1" });
+    cases.push_back({ bars(1, 1, 3, 2), "after" });
+    cases.push_back({ bars(1, 1, 1, 99), "outside the score" });
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.voices = { 5 }; cases.push_back({ a, "not 1-4" }); }
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.voices = {}; cases.push_back({ a, "empty" }); }
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.include = { "noise" }; cases.push_back({ a, "unknown element type" }); }
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.from.beat = 1.5; a.from.hasBeat = true; cases.push_back({ a, "nothing starts at \"from\"" }); }
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.to.beat = 2.5; a.to.hasBeat = true; cases.push_back({ a, "nothing starts at \"to\"" }); }
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.from.beat = 4; a.from.hasBeat = true; cases.push_back({ a, "past the end" }); }
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.from.beat = 1.0001; a.from.hasBeat = true; cases.push_back({ a, "not a position" }); }
+    { ClearRangeArgs a = bars(1, 1, 2, 2); a.to.beat = 1; a.to.hasBeat = true; cases.push_back({ a, "empty" }); }
+    for (const Case& c : cases) {
+        Outcome o = runClear(s.get(), c.a);
+        EXPECT_FALSE(o.ret) << c.expect;
+        EXPECT_TRUE(has(o.ret.text(), c.expect)) << c.expect << " -> " << o.ret.text();
+        EXPECT_EQ(s->undoStack()->currentIndex(), idx) << c.expect;
+        EXPECT_EQ(print(s.get(), 1), before) << c.expect;
+    }
 }
