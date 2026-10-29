@@ -5,7 +5,7 @@
 # Each source -> MusicXML (music21) -> .mscz (the agent build's own converter) -> back to
 # MusicXML -> note counts compared. Output goes to tests/fixtures/corpus/ (git-ignored: the
 # encodings are music21's; this script regenerates them).
-#   ~/.venvs/MuseClaude/bin/python -I tools/fixtures/make_corpus_fixtures.py
+#   ~/.venvs/MuseClaude/bin/python -I tools/fixtures/make_corpus_fixtures.py [fixture-name ...]
 import json
 import pathlib
 import subprocess
@@ -25,6 +25,7 @@ SOURCES = [
     ("mozart-k545-i", "mozart/k545/movement1_exposition", None, "piano 2 staves, trills, Alberti bass, clef change"),
     ("mozart-k458-i", "mozart/k458/movement1", None, "string quartet, 6/8, dynamics"),
     ("beethoven-op18-1-i", "beethoven/opus18no1/movement1.mxl", None, "long quartet movement (stress), turns, hairpins"),
+    ("beethoven-op74", "beethoven/opus74.mxl", None, "whole quartet, over 30 pages (G1 read time)"),
     ("haydn-op74-1-i", "haydn/opus74no1/movement1", None, "quartet, repeats"),
     ("schumann-dichterliebe-2", "schumann_robert/dichterliebe_no2.xml", None, "song: voice + piano, lyrics"),
     ("clara-schumann-polonaise-1", "schumann_clara/polonaise_op1n1.mxl", None, "piano, dense rhythms, ornaments"),
@@ -60,10 +61,14 @@ def main():
         print(f"error: build the agent app first ({MSCORE})", file=sys.stderr)
         return 2
     OUT.mkdir(parents=True, exist_ok=True)
-    report = []
+    only = set(sys.argv[1:])
+    old = json.loads((OUT / "report.json").read_text()) if only and (OUT / "report.json").exists() else []
+    report = [e for e in old if e["name"] not in only]
     with tempfile.TemporaryDirectory() as tmp:
         tmp = pathlib.Path(tmp)
         for name, path, title, why in SOURCES:
+            if only and name not in only:
+                continue
             entry = {"name": name, "source": path, "title": title, "why": why}
             try:
                 s = load(path, title)
@@ -84,6 +89,8 @@ def main():
             report.append(entry)
             status = "ok " if entry.get("converted") and entry.get("same_notes") else "!! "
             print(status, name, {k: entry.get(k) for k in ("notes_source", "notes_roundtrip", "error") if entry.get(k) is not None})
+    order = [src[0] for src in SOURCES]
+    report.sort(key=lambda e: order.index(e["name"]) if e["name"] in order else len(order))
     (OUT / "report.json").write_text(json.dumps(report, indent=2))
     return 0 if all(e.get("converted") for e in report) else 1
 

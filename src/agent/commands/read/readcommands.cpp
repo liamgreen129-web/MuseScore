@@ -22,6 +22,9 @@
 #include "readcommands.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstdlib>
+#include <map>
 
 #include "agentenv.h"
 #include "registry/commandregistry.h"
@@ -241,6 +244,45 @@ Result scoreOverview(const Params&, AgentEnv& env)
 
 // ------------------------------------------------------------------ score_read
 
+//! The last bar of `from..to` whose text still fits under MAX_READ_CHARS, from the printed text:
+//! every `m<N>` line (and the `%` comments after it) counts towards bar N, everything else
+//! (staff headers, blank lines) is overhead that a shorter read prints too.
+int lastBarThatFits(const std::string& text, int from, int to)
+{
+    std::map<int, size_t> perBar;
+    size_t overhead = 0;
+    int bar = 0;
+    size_t start = 0;
+    while (start < text.size()) {
+        size_t end = text.find('\n', start);
+        if (end == std::string::npos) {
+            end = text.size();
+        }
+        const size_t len = end - start + 1;
+        if (text[start] == 'm' && start + 1 < end && std::isdigit(static_cast<unsigned char>(text[start + 1]))) {
+            bar = std::atoi(text.c_str() + start + 1);
+            perBar[bar] += len;
+        } else if (text[start] == '%' && bar > 0) {
+            perBar[bar] += len;
+        } else {
+            overhead += len;
+        }
+        start = end + 1;
+    }
+    // 5% margin: a later start bar can print a few more attributes in its first line
+    const size_t budget = MAX_READ_CHARS * 95 / 100;
+    size_t used = overhead;
+    int last = from;
+    for (int b = from; b <= to; ++b) {
+        used += perBar[b];
+        if (used > budget) {
+            break;
+        }
+        last = b;
+    }
+    return last;
+}
+
 Result scoreRead(const Params& p, AgentEnv& env)
 {
     MasterScore* score = currentScore(env);
@@ -269,11 +311,10 @@ Result scoreRead(const Params& p, AgentEnv& env)
 
     const std::string text = nt::write(read::printScore(score, opt));
     if (text.size() > MAX_READ_CHARS) {
-        const int bars = to - from + 1;
-        const int fits = std::max(1, static_cast<int>(bars * (static_cast<double>(MAX_READ_CHARS) / text.size()) * 0.9));
+        const int last = lastBarThatFits(text, from, to);
         return { makeErr(Err::Range, "bars " + std::to_string(from) + "-" + std::to_string(to) + " are too long to return at once ("
-                         + std::to_string(text.size()) + " characters); read about " + std::to_string(fits)
-                         + " bars at a time, or fewer staves"), {} };
+                         + std::to_string(text.size()) + " characters); read bars " + std::to_string(from) + "-"
+                         + std::to_string(last) + " next, or fewer staves"), {} };
     }
 
     Result r;

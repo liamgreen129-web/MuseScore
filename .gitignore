@@ -92,3 +92,4 @@ tests/fixtures/corpus/
 build.tests/
 test.log
 .claude/worktrees/
+test-*.log

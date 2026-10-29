@@ -79,6 +79,8 @@ scripts/install.sh          # copies to /Applications/MuseScore Agent.app, ad-ho
 scripts/sync-upstream.sh    # fetch next 4.7.x tag, rebase agent/4.7, rebuild, test
 python3 -I tests/agent/test_server.py   # P1.1 server checks (opens the build in the background)
 python3 -I tests/agent/test_hello.py    # P1.2 registry, hello, discovery records
+python3 -I tests/agent/test_read.py     # P1.7 read commands (needs tests/fixtures/corpus/)
+python3 -I tests/agent/test_export.py   # G1: score_export vs the UI save, every fixture × 4 formats
 scripts/test.sh             # agent unit tests (gtest) in build.tests; AGENT_DUMP_DIR=dir dumps printed fixtures
 ```
 

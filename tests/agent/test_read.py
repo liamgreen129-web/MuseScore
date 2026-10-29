@@ -124,9 +124,13 @@ def main():
         t0 = time.time()
         err, _, text = call(port, token, "score_read")
         dt = time.time() - t0
-        check("whole Beethoven movement refused with a bar count that fits",
-              err and text.startswith("E_RANGE") and "bars at a time" in text, text[:200])
+        check("whole Beethoven movement refused with a range that fits",
+              err and text.startswith("E_RANGE") and " next" in text, text[:200])
         check("refusal is quick (< 3 s incl. printing 4000 notes)", dt < 3, dt)
+        if err and " next" in text:
+            a, b = (int(x) for x in text.split("read bars ")[1].split()[0].split("-"))
+            err2, rd, text2 = call(port, token, "score_read", {"from": a, "to": b})
+            check("the suggested range reads without a second refusal", not err2, text2[:200])
         t0 = time.time()
         err, rd, text = call(port, token, "score_read", {"from": 1, "to": 40})
         check("40 bars of the quartet read", not err and rd.get("text", "").count("\n") > 100, text[:200])
@@ -135,6 +139,33 @@ def main():
         check("validate reports the import's cross-voice ties as details", not err and len(va.get("details", [])) > 0, va.get("details"))
     finally:
         c.stop()
+
+    # --- G1: a score over 30 pages reads, start to end, in under 2 s
+    big = CORPUS / "beethoven-op74.mscz"
+    if big.exists():
+        d, port = open_score(bundle, big, token)
+        try:
+            _, ov, _ = call(port, token, "score_overview")
+            _, rd, _ = call(port, token, "score_render", {"page": 1})
+            bars, pages = ov["score"]["bars"], rd.get("pages", 0)
+            t0 = time.time()
+            frm, calls, refusals = 1, 0, 0
+            while frm <= bars and calls < 50:
+                err, out, text = call(port, token, "score_read", {"from": frm})
+                calls += 1
+                if err:
+                    refusals += 1
+                    frm_, to_ = (int(x) for x in text.split("read bars ")[1].split()[0].split("-"))
+                    err, out, text = call(port, token, "score_read", {"from": frm_, "to": to_})
+                    calls += 1
+                    if err:
+                        break
+                frm = out["to"] + 1
+            dt = time.time() - t0
+            check(f"{pages}-page quartet ({bars} bars) read start to end", frm > bars and pages >= 30, (frm, pages, text[:200]))
+            check(f"read in under 2 s ({calls} calls, {dt:.2f} s)", dt < 2, dt)
+        finally:
+            d.stop()
 
     print()
     if failures:

@@ -8,8 +8,11 @@
 set -euo pipefail
 APP="$1"
 IDENTITY="MuseScore Agent Local"
-if security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$IDENTITY\""; then
-    codesign --force --deep --sign "$IDENTITY" "$APP"
+# self-signed and not trusted, so look it up without -v and sign by hash; codesign
+# accepts it, and the designated requirement pins the leaf hash, which TCC remembers
+HASH="$(security find-identity -p codesigning 2>/dev/null | awk -v n="\"$IDENTITY\"" '$0 ~ n {print $2; exit}')"
+if [[ -n "$HASH" ]]; then
+    codesign --force --deep --sign "$HASH" "$APP"
     echo "signed with \"$IDENTITY\""
 else
     codesign --force --deep --sign - "$APP"
