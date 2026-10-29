@@ -19,6 +19,7 @@
 #include "allcommands.h"
 
 #include "app/appcommands.h"
+#include "expression-lines/expressionlines.h"
 #include "notes/notescommands.h"
 #include "read/readcommands.h"
 #include "session/sessioncommands.h"
@@ -33,5 +34,6 @@ void mu::agent::registerAllCommands(CommandRegistry& registry)
     registerExportCommands(registry);
     registerSessionCommands(registry);
     registerNotesCommands(registry);
+    registerExpressionLinesCommands(registry);
     registerTestCommands(registry); // only with MUSESCORE_AGENT_TEST_COMMANDS=1
 }
