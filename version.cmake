@@ -24,7 +24,8 @@ set(MUSE_APP_NAME_MACHINE_READABLE "MuseScoreStudio")
 set(MUSE_APP_NAME_HUMAN_READABLE_COMPAT "MuseScore")
 set(MUSE_APP_NAME_MACHINE_READABLE_COMPAT "MuseScore")
 
-set(MUSE_APP_GUI_IDENTIFIER org.musescore.${MUSE_APP_NAME_MACHINE_READABLE_COMPAT})
+# AGENT: separate bundle id so the agent build shares no prefs, Launch Services or TCC entries with the official app
+set(MUSE_APP_GUI_IDENTIFIER com.liamgreen.MuseScoreAgent)
 
 set(MUSE_APP_VERSION_MAJOR "4")
 set(MUSE_APP_VERSION_MINOR "7")
@@ -39,7 +40,8 @@ if (NOT CMAKE_BUILD_NUMBER)
 endif()
 
 # TODO: Remove
-set(MUSE_APP_TITLE "${MUSE_APP_NAME_HUMAN_READABLE}")
+# AGENT: distinct window title and bundle display name
+set(MUSE_APP_TITLE "MuseScore Agent")
 set(MUSE_APP_NAME "${MUSE_APP_NAME_MACHINE_READABLE_COMPAT}")
 set(MUSE_APP_TITLE_VERSION "${MUSE_APP_TITLE} ${MUSE_APP_VERSION_MAJOR}")
 set(MUSE_APP_NAME_VERSION "${MUSE_APP_NAME} ${MUSE_APP_VERSION_MAJOR}")

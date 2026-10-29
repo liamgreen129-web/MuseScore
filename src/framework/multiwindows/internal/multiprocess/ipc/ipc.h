@@ -35,9 +35,9 @@ class QLocalSocket;
 
 namespace muse::ipc {
 #ifdef MUSE_APP_UNSTABLE
-static const QString SERVER_NAME("musescore-app-ipc-" MUSE_APP_VERSION_MAJOR "-development");
+static const QString SERVER_NAME("musescore-agent-ipc-" MUSE_APP_VERSION_MAJOR "-development"); // AGENT: own IPC group
 #else
-static const QString SERVER_NAME("musescore-app-ipc-" MUSE_APP_VERSION_MAJOR);
+static const QString SERVER_NAME("musescore-agent-ipc-" MUSE_APP_VERSION_MAJOR); // AGENT: own IPC group
 #endif
 
 using ID = QString;

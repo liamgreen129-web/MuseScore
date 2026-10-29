@@ -7,7 +7,8 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 
-	<key>UTExportedTypeDeclarations</key>
+	<!-- AGENT: was UTExportedTypeDeclarations; the official app owns these types -->
+	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<!-- MuseScore documents -->
 		<dict>
@@ -123,7 +124,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
-			<string>Owner</string>
+			<string>Alternate</string> <!-- AGENT: was Owner; official app stays the default opener -->
 			<key>LSTypeIsPackage</key>
 			<false/>
 		</dict>
@@ -143,7 +144,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
-			<string>Owner</string>
+			<string>Alternate</string> <!-- AGENT: was Owner; official app stays the default opener -->
 			<key>LSTypeIsPackage</key>
 			<false/>
 		</dict>
@@ -161,7 +162,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
-			<string>Owner</string>
+			<string>Alternate</string> <!-- AGENT: was Owner; official app stays the default opener -->
 			<key>LSTypeIsPackage</key>
 			<false/>
 		</dict>
@@ -181,7 +182,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
-			<string>Owner</string>
+			<string>Alternate</string> <!-- AGENT: was Owner; official app stays the default opener -->
 			<key>LSTypeIsPackage</key>
 			<false/>
 		</dict>
@@ -201,7 +202,7 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
-			<string>Owner</string>
+			<string>Alternate</string> <!-- AGENT: was Owner; official app stays the default opener -->
 			<key>LSTypeIsPackage</key>
 			<false/>
 		</dict>
@@ -566,10 +567,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>org.musescore.musescore.musescoreurl</string>
+			<string>com.liamgreen.musescoreagent.url</string> <!-- AGENT: own URL scheme so musescore:// links keep going to the official app -->
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>musescore</string>
+				<string>musescore-agent</string>
 			</array>
 		</dict>
 	</array>
