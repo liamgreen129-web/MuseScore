@@ -14,7 +14,7 @@ Status values: `—` not started · `spec` spec sheet done · `impl` implemented
 | `notes` | write_voice, add_note_to_chord, remove_note, set_duration, tie, tuplet, grace, clear_range, exchange_voices, batch | 2 | Conductor | — | — |
 | `pitch` | set_pitch, transpose | 2 | Wave A | — | — |
 | `expression-marks` | add_dynamic, add_hairpin, add_articulation, add_ornament, add_fermata, add_breath | 2 | Wave A | — | — |
-| `expression-lines` | add_slur, add_line (pedal, ottava, trill, volta, text line) | 2 | Wave A | — | — |
+| `expression-lines` | add_slur, add_line (pedal, ottava, trill, volta, text line) | 2 | Wave A | spec | — |
 | `text` | add_text (staff, system, expression, tempo, rehearsal), add_chord_symbol, add_lyric | 2 | Wave A | — | — |
 | `structure` | insert_measures, remove_measures, split_measure, join_measures, set_time_signature, set_key_signature, set_tempo, set_barline, set_repeat, add_break, add_clef | 3 | Wave B | — | — |
 | `instrumentation` | add_part, remove_part, rename_part, set_instrument, add_staff, set_staff_type, set_transposition | 3 | Wave B | — | — |

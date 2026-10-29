@@ -50,3 +50,9 @@
 - 2026-10-29 · MuseScore's own SetupCompilerCache.cmake steps aside when CMAKE_*_COMPILER_LAUNCHER is set (CMake warning, expected) · ccache: 1047 misses on the first build, cache 0.6 GB.
 - 2026-10-29 · The installed bundle is not self-contained: rpaths point at ~/Qt/6.10.2/macos/lib and ~/musescore_deps_macos/lib, no Frameworks/ or Qt PlugIns/ in the bundle · fine for a personal build on a machine with the toolchain (the mini must use the same paths); never delete ~/Qt while the agent app is in use. macdeployqt (CI package.sh) would make it standalone; not needed now.
 - 2026-10-29 · Sizes: bundle 266 MB, build.release 5.3 GB (not ~20 GB), 33 GB free after build.
+
+## P0.S findings that bind the core (2026-10-29)
+
+- 2026-10-29 · Agent commands must never call `NotationInteraction::applyPaletteElement` / `apply()` as-is · they end in `checkAndShowError()` (notationinteraction.cpp:1372, 2084, 2241), which opens a modal dialog and clears the pending error, so a failed step would neither roll back nor stay dialog-free. Decide in P2.1 whether to clear-and-call or reimplement the range branch on `Score` (expression-lines spec, open question 2).
+- 2026-10-29 · `Trill::linkedClone` dereferences `m_ornament` unchecked (trill.cpp:213) · any trill must have `setTrillType()` called before it is added to a score with parts. Verified by the conductor.
+- 2026-10-29 · Action controller and UI actions live in `src/notationscene/internal/`, not `src/notation/internal/` · fixed in .claude/agents/api-scout.md.

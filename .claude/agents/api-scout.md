@@ -15,7 +15,7 @@ docs/agent/COMMANDS.md ("Spec sheet format"). The implementer will build from yo
 sheet without re-researching, so precision matters more than speed.
 
 How to work:
-- Start from the UI: find the action code (src/notation/internal/notationactioncontroller.cpp,
+- Start from the UI: find the action code (src/notationscene/internal/notationactioncontroller.cpp,
   notationuiactions.cpp), follow it into INotationInteraction (src/notation/inotationinteraction.h,
   internal/notationinteraction.cpp) and down into src/engraving (editing/, dom/).
 - Read the plugin API (src/engraving/api/v1) for the same edit only as a cautionary
