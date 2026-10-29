@@ -357,7 +357,7 @@ class Runner:
         # --- goldens
         for g in sc["goldens"]:
             gpath = self.dir / g["path"]
-            data = normalise(g["format"], inst.export(g["format"]))
+            data = normalise(g["format"], inst.export(g["format"]), golden=True)
             label = f"golden {g['format']} {g['path']}"
             if self.update_goldens:
                 if res.failed:  # never make a broken score the reference
@@ -369,7 +369,7 @@ class Runner:
             elif not gpath.exists():
                 res.add("FAIL", label, "golden missing; run with --update-goldens and review the diff")
             else:
-                diff = compare(g["format"], gpath.read_bytes(), data, "golden", "export")
+                diff = compare(g["format"], gpath.read_bytes(), data, "golden", "export", golden=True)
                 res.check(label, not diff, diff)
 
         # --- invariants

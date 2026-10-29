@@ -12,13 +12,17 @@
   ],
   "steps": [
     {
+      "wait": 5,
+      "note": "let the instance's audio finish loading"
+    },
+    {
       "tool": "test_dispatch",
       "args": {
         "action": "play"
       }
     },
     {
-      "wait": 1
+      "wait": 2
     },
     {
       "tool": "test_dispatch",
