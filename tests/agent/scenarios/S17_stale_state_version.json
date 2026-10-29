@@ -55,13 +55,8 @@
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Soprano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 2,
-        "content": "A4:h B4:h",
+        "staff": 1,
+        "content": "m2 v1 | A4:h B4:h",
         "expectStateVersion": "${v}"
       },
       "error": "E_STALE"
@@ -98,6 +93,7 @@
     "undoRedo": true
   },
   "questions": [
-    "No write command's schema has expectStateVersion (only undo/redo in session.md). S17 assumes every write takes an optional expectStateVersion and refuses with E_STALE; this is a core (P2.1) decision."
+    "No write command's schema has expectStateVersion (only undo/redo in session.md). S17 assumes every write takes an optional expectStateVersion and refuses with E_STALE; this is a core (P2.1) decision.",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

@@ -11,6 +11,7 @@ set(MODULE_TEST_SRC
     ${CMAKE_CURRENT_LIST_DIR}/notation_validate_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/scoreprinter_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/core_tests.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/notes_tests.cpp
     ${PROJECT_SOURCE_DIR}/src/engraving/tests/utils/scorerw.cpp
     ${PROJECT_SOURCE_DIR}/src/engraving/tests/utils/scorerw.h
 )
@@ -19,6 +20,7 @@ set(MODULE_TEST_LINK
     agent_notation
     agent_read
     agent_core
+    agent_notes
     engraving
 )
 

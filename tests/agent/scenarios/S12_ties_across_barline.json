@@ -12,14 +12,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 1,
-        "toMeasure": 2,
-        "content": "E5:q G5:q A5:h~ | A5:q F5:q [C5,E5~]:h"
+        "staff": 1,
+        "content": "m1 v1 | E5:q G5:q A5:h~\nm2 v1 | A5:q F5:q [C5,E5~]:h"
       },
       "note": "tie inside the write, and a chord-note tie out of m2 onto m3's first note E5"
     },
@@ -51,30 +45,26 @@
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 4,
-        "content": "D5:q F5:q G5:q B4:q~"
+        "staff": 1,
+        "content": "m4 v1 | D5:q F5:q G5:q B4:q~"
       },
-      "error": "E_TIE",
-      "note": "m5 starts with C#5, so the tie cannot land"
+      "error": "E_INVALID_ARG",
+      "note": "m5 starts with C#5, so the tie cannot land",
+      "text": {
+        "contains": "~"
+      }
     },
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 4,
-        "content": "D5:q~ F5:q G5:q B4:q"
+        "staff": 1,
+        "content": "m4 v1 | D5:q~ F5:q G5:q B4:q"
       },
-      "error": "E_TIE",
-      "note": "next event has a different pitch"
+      "error": "E_INVALID_ARG",
+      "note": "next event has a different pitch",
+      "text": {
+        "contains": "~"
+      }
     }
   ],
   "goldens": [
@@ -89,6 +79,7 @@
   },
   "questions": [
     "Tie out of the last written bar onto an existing note (notes.md: searchTieNote) vs. requiring tieFromPrevious on the next write: assumed allowed without a flag.",
-    "write_voice has tieFromPrevious (tie into the first written bar) but notes.md does not say whether a `~` on the last event of the written range is checked against the bar after it; assumed yes (E_TIE when it cannot land)."
+    "write_voice has tieFromPrevious (tie into the first written bar) but notes.md does not say whether a `~` on the last event of the written range is checked against the bar after it; assumed yes (E_TIE when it cannot land).",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

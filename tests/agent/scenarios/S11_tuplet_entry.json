@@ -12,13 +12,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 8,
-        "content": "{3:2 B4:e C5:e D5:e} E5:q {5:4 F5:s G5:s F5:s E5:s D5:s} C5:h"
+        "staff": 1,
+        "content": "m8 v1 | {3:2 B4:e C5:e D5:e} {5:4 F5:s G5:s F5:s E5:s D5:s} C5:h"
       }
     },
     {
@@ -34,7 +29,7 @@
         "text": {
           "all": [
             {
-              "contains": "m8 v1 | {3:2 B4:e C5:e D5:e} E5:q {5:4 F5:s G5:s F5:s E5:s D5:s} C5:h"
+              "contains": "m8 v1 | {3:2 B4:e C5:e D5:e} {5:4 F5:s G5:s F5:s E5:s D5:s} C5:h"
             }
           ]
         }
@@ -44,13 +39,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 7,
-        "content": "{3:2 Eb5:q {3:2 Gb5:e E5:e G#5:e} B4:q} r:h"
+        "staff": 1,
+        "content": "m7 v1 | {3:2 Eb5:q {3:2 Gb5:e E5:e G#5:e} B4:q} r:h"
       },
       "note": "nested"
     },
@@ -76,16 +66,14 @@
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 6,
-        "content": "{3:2 G5:e C6:e} E6:q C6:h"
+        "staff": 1,
+        "content": "m6 v1 | {3:2 G5:e C6:e} E6:q C6:h"
       },
-      "error": "E_TUPLET",
-      "note": "tuplet contents do not fill it"
+      "error": "E_INVALID_ARG",
+      "note": "tuplet contents do not fill it",
+      "text": {
+        "contains": "tuplet"
+      }
     }
   ],
   "goldens": [
@@ -100,6 +88,7 @@
   },
   "questions": [
     "A 3:2 triplet of quarters containing a nested eighth triplet: notes.md requires total/ratio.denominator to be one TDuration; assumed valid here.",
-    "Whether E_TUPLET or E_BAR_SUM wins when an unfilled tuplet also makes the bar short is not specified."
+    "Whether E_TUPLET or E_BAR_SUM wins when an unfilled tuplet also makes the bar short is not specified.",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

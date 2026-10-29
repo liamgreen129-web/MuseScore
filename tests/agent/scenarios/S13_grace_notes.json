@@ -12,13 +12,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 3,
-        "content": "g/(F5:e) E5:q D5:q g(B4:s C5:s) D5:q C5:q ga(B4:s C5:s)"
+        "staff": 1,
+        "content": "m3 v1 | g/(F5:e) E5:q D5:q g(B4:s C5:s) D5:q C5:q ga(B4:s C5:s)"
       }
     },
     {
@@ -43,16 +38,14 @@
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 3,
-        "content": "g(D5:e) r:q D5:q C5:q A4:q"
+        "staff": 1,
+        "content": "m3 v1 | g(D5:e) r:q D5:q C5:q A4:q"
       },
-      "error": "E_GRACE",
-      "note": "grace note before a rest"
+      "error": "E_INVALID_ARG",
+      "note": "grace note before a rest",
+      "text": {
+        "contains": "grace"
+      }
     }
   ],
   "goldens": [
@@ -66,6 +59,7 @@
     "undoRedo": true
   },
   "questions": [
-    "Grace notes after a note (`ga(...)`) mid-bar cannot come from MusicXML (fixtures README); the read form after a write is assumed to round-trip."
+    "Grace notes after a note (`ga(...)`) mid-bar cannot come from MusicXML (fixtures README); the read form after a write is assumed to round-trip.",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

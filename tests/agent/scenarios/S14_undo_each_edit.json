@@ -87,14 +87,10 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Soprano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 4,
-        "content": "A4:q B4:q C#5:q+ferm A4:q"
-      }
+        "staff": 1,
+        "content": "m4 v1 | A4:q B4:q C#5:q A4:q"
+      },
+      "note": "(marks are refused by write_voice; the fermata is not part of the rewrite)"
     },
     {
       "tool": "$undo"
@@ -160,6 +156,7 @@
   },
   "questions": [
     "This is the explicit per-edit form; every other write scenario also runs the undo/redo invariant at the end.",
-    "E_NOTHING_TO_UNDO at index 0 assumes the agent's undo refuses rather than no-ops (session.md undo)."
+    "E_NOTHING_TO_UNDO at index 0 assumes the agent's undo refuses rather than no-ops (session.md undo).",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

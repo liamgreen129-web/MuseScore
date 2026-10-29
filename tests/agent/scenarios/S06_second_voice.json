@@ -11,14 +11,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 2,
-        "fromMeasure": 3,
-        "toMeasure": 4,
-        "content": "G4:h F4:h | _:h D4:h"
+        "staff": 1,
+        "content": "m3 v2 | G4:h F4:h\nm4 v2 | _:h D4:h"
       }
     },
     {
@@ -52,30 +46,23 @@
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 5,
-        "fromMeasure": 3,
-        "content": "G4:w"
+        "staff": 1,
+        "content": "m3 v5 | G4:w"
       },
-      "error": "E_RANGE",
+      "error": "E_INVALID_ARG",
       "note": "voice 5"
     },
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 2,
-        "fromMeasure": 3,
-        "content": "G4:h"
+        "staff": 1,
+        "content": "m3 v2 | G4:h"
       },
-      "error": "E_BAR_SUM",
-      "note": "voice 2 must fill with _"
+      "error": "E_INVALID_ARG",
+      "note": "voice 2 must fill with _",
+      "text": {
+        "contains": "short"
+      }
     }
   ],
   "goldens": [
@@ -90,6 +77,7 @@
   },
   "questions": [
     "How a gap at the start of voice 2 is printed after the write: assumed `_:h` (NOTATION.md 4); MuseScore stores no rest there, so the printer may print nothing for that time.",
-    "Voice out of 1-4: the input schema has min/max, so the server may reject it as E_INVALID_ARG (schema) rather than E_RANGE (notes.md)."
+    "Voice out of 1-4: the input schema has min/max, so the server may reject it as E_INVALID_ARG (schema) rather than E_RANGE (notes.md).",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

@@ -69,13 +69,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Flute",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 4,
-        "content": "C5:h A4:h"
+        "staff": 1,
+        "content": "m4 v1 | C5:h A4:h"
       },
       "note": "a note edit in the master reaches the Flute part (A4 = 69 appears nowhere else in the flute)"
     },
@@ -101,6 +96,7 @@
   "questions": [
     "Part name addressing: the master's part is 'Clarinet in B♭' (with the flat sign) but its excerpt is named 'Clarinet in Bb'; which name does staff.part match (and is ASCII 'Bb' accepted)?",
     "parts-linked.mscz reports needSave=true right after opening (seen in this harness); the stale-state and undo checks are unaffected, but the conductor may want to know.",
-    "Editing from a part view (current view = an excerpt) is not scriptable: there is no command to switch the current view; S20 edits the master and checks the excerpts in the mscz export."
+    "Editing from a part view (current view = an excerpt) is not scriptable: there is no command to switch the current view; S20 edits the master and checks the excerpts in the mscz export.",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

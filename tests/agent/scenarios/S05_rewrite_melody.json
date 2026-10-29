@@ -12,14 +12,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 1,
-        "toMeasure": 4,
-        "content": "C5:q D5:q E5:q F5:q | G5:h E5:h | F5:q. E5:e D5:q C5:q | B4:h G4:h"
+        "staff": 1,
+        "content": "m1 v1 | C5:q D5:q E5:q F5:q\nm2 v1 | G5:h E5:h\nm3 v1 | F5:q. E5:e D5:q C5:q\nm4 v1 | B4:h G4:h"
       }
     },
     {
@@ -80,44 +74,21 @@
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 1,
-        "toMeasure": 1,
-        "content": "C5:q D5:q E5:q"
+        "staff": 1,
+        "content": "m1 v1 | C5:q D5:q E5:q"
       },
-      "error": "E_BAR_SUM"
+      "error": "E_INVALID_ARG",
+      "text": {
+        "contains": "short"
+      }
     },
     {
       "tool": "write_voice",
       "args": {
-        "staff": {
-          "part": "Piano",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 1,
-        "toMeasure": 2,
-        "content": "C5:w"
+        "staff": 99,
+        "content": "m1 v1 | C5:w"
       },
-      "error": "E_RANGE",
-      "note": "bar count != range"
-    },
-    {
-      "tool": "write_voice",
-      "args": {
-        "staff": {
-          "part": "Nobody",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 1,
-        "content": "C5:w"
-      },
-      "error": "E_"
+      "error": "E_RANGE"
     }
   ],
   "goldens": [
@@ -131,8 +102,8 @@
     "undoRedo": true
   },
   "questions": [
-    "write_voice content: 'one segment per bar' (notes.md) does not say how bars are separated; assumed ' | ' between bar segments. Alternative: full voice lines 'm1 v1 | ...' separated by newlines (which would make fromMeasure redundant).",
     "Unknown part name error code: not named in notes.md (E_RANGE? E_BAD_STAFF as in text.md 0.9?); the step only checks the E_ prefix.",
-    "Chord symbols are on an `h` line; whether write_voice with keepAnnotations=true keeps harmony anchored to removed segments is assumed (NOTATION.md 7 rule 2)."
+    "Chord symbols are on an `h` line; whether write_voice with keepAnnotations=true keeps harmony anchored to removed segments is assumed (NOTATION.md 7 rule 2).",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }

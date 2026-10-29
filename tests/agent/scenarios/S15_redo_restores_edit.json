@@ -26,13 +26,8 @@
       "tool": "write_voice",
       "writes": true,
       "args": {
-        "staff": {
-          "part": "Alto",
-          "staffIndex": 0
-        },
-        "voice": 1,
-        "fromMeasure": 2,
-        "content": "F#4:h E4:h"
+        "staff": 2,
+        "content": "m2 v1 | F#4:h E4:h"
       }
     },
     {
@@ -131,6 +126,7 @@
     "undoRedo": true
   },
   "questions": [
-    "The engine checks each $undo/$redo against the export recorded at that undo index, so 'restores' is byte-for-byte on the invariant format (mscz)."
+    "The engine checks each $undo/$redo against the export recorded at that undo index, so 'restores' is byte-for-byte on the invariant format (mscz).",
+    "Settled 2026-10-29 (P2.3): write_voice takes staff (1-based) and content as voice lines 'm<N> v<V> | ...' exactly as score_read prints them; validation problems are E_INVALID_ARG naming the bar and voice; an unknown staff is E_RANGE."
   ]
 }
