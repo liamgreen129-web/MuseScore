@@ -45,6 +45,7 @@ target_sources(agent PRIVATE
     commands/app/appcommands.cpp
     commands/app/appcommands.h
     commands/read/readcommands.cpp
+    commands/read/exportcommands.cpp
     commands/read/readcommands.h
 
     platform/background.h

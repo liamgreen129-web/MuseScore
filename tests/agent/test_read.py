@@ -48,7 +48,7 @@ def main():
         _, _, res = rpc(port, token, "tools/list")
         names = {t["name"] for t in res["result"]["tools"]}
         check("tools/list has the read group",
-              {"score_overview", "score_read", "score_validate", "score_changes"} <= names, names)
+              {"score_overview", "score_read", "score_validate", "score_changes", "score_export", "score_render"} <= names, names)
         err, _, text = call(port, token, "score_read")
         check("score_read with no score -> E_NO_SCORE", err and text.startswith("E_NO_SCORE"), text)
     finally:
@@ -91,6 +91,27 @@ def main():
         check("score_validate: chorale is clean", not err and va.get("ok") is True, va)
         err, ch, text = call(port, token, "score_changes", {"since": 0})
         check("score_changes: nothing yet", not err and ch.get("stateVersion") == 0 and ch.get("bars") == "", ch)
+
+        exports = AGENT_DIR / "exports"
+        heads = {"musicxml": b"<?xml", "mxl": b"PK", "midi": b"MThd", "mscz": b"PK", "pdf": b"%PDF"}
+        for fmt, magic in heads.items():
+            err, ex, text = call(port, token, "score_export", {"format": fmt})
+            path = pathlib.Path(ex.get("path", "/nonexistent"))
+            ok = not err and path.exists() and path.read_bytes()[:len(magic)] == magic
+            check(f"score_export {fmt}: real file in the exports folder", ok and path.parent == exports, text[:200])
+        err, ex, _ = call(port, token, "score_export", {"format": "musicxml"})
+        xml = pathlib.Path(ex.get("path", "/nonexistent")).read_text(errors="replace") if not err else ""
+        check("exported MusicXML has the four parts", xml.count("<score-part ") == 4, xml.count("<score-part "))
+        err, _, text = call(port, token, "score_export", {"format": "mscx"})
+        check("mscx export is not offered (folder-deletion hazard)", err and text.startswith("E_INVALID_ARG"), text)
+        err, rn, text = call(port, token, "score_render", {"page": 1})
+        png = pathlib.Path(rn.get("path", "/nonexistent"))
+        check("score_render page 1 -> PNG", not err and png.exists() and png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n", text[:200])
+        check("PNG is a real page (>20 KB)", png.exists() and png.stat().st_size > 20000, png.stat().st_size if png.exists() else 0)
+        err, rn, text = call(port, token, "score_render", {"bar": nbars})
+        check("score_render by bar", not err and rn.get("page", 0) >= 1, text[:200])
+        err, _, text = call(port, token, "score_render", {"page": 99})
+        check("render page 99 -> E_RANGE", err and text.startswith("E_RANGE"), text)
 
         err, hello, _ = call(port, token, "hello")
         check("reads leave the score clean", hello.get("score", {}).get("needSave") is False, hello.get("score"))

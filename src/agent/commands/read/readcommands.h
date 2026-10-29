@@ -23,4 +23,7 @@ class CommandRegistry;
 
 //! read group: score_overview, score_read, score_validate, score_changes (spec: docs/agent/specs/read.md)
 void registerReadCommands(CommandRegistry& registry);
+
+//! read group, part 2: score_export, score_render
+void registerExportCommands(CommandRegistry& registry);
 }

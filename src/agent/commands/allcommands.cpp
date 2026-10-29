@@ -27,4 +27,5 @@ void mu::agent::registerAllCommands(CommandRegistry& registry)
 {
     registerAppCommands(registry);
     registerReadCommands(registry);
+    registerExportCommands(registry);
 }

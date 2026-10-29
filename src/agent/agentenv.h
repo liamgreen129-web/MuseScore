@@ -26,6 +26,7 @@
 #include "context/iglobalcontext.h"
 #include "multiwindows/imultiwindowsprovider.h"
 #include "multiwindows/internal/multiprocess/imultiprocessprovider.h"
+#include "project/inotationwritersregister.h"
 
 namespace mu::agent {
 //! One committed change to the score, as published by the undo stack (ScoreChanges).
@@ -66,6 +67,7 @@ public:
     muse::ContextInject<context::IGlobalContext> globalContext = { this };
     muse::GlobalInject<muse::mi::IMultiWindowsProvider> multiwindowsProvider;
     muse::GlobalInject<muse::mi::IMultiProcessProvider> multiProcessProvider;
+    muse::ContextInject<project::INotationWritersRegister> writers = { this };
 
     int port = 0;
     long long pid = 0;
