@@ -42,3 +42,11 @@
 - 2026-10-29 · Update module off and crashpad off stay build options (scripts/build.sh), not source edits · ninja_build.sh already defaults crashpad OFF.
 - 2026-10-29 · check-identity.sh has 10 checks; run against the official 4.7.4 app it fails all 10 as expected.
 - 2026-10-29 · Found a sixth shared item: the Quick Look extension (`src/macos_integration`, id `org.musescore.MuseScore.QuickLookPreviewExtension`, built by default via MUE_BUILD_MACOS_INTEGRATION=ON) · a second copy with the same id could take over Finder previews of .mscz. Turn it off with `-DMUE_BUILD_MACOS_INTEGRATION=OFF`, seeded into build.release's CMake cache by scripts/build.sh before ninja_build.sh runs (ninja_build.sh has no pass-through for extra cmake options and doesn't override cached ones). The same seeding carries the ccache launcher. check-identity.sh now fails on any embedded .appex with an org.musescore.* id.
+
+## P0.6 first build (2026-10-29)
+
+- 2026-10-29 · First build succeeded with Command Line Tools only; full Xcode not needed · configure seed 19:04, ninja 19:13–19:20 at -j6 (1047 unity compile units, 133 warnings, 0 errors), install and check-identity PASS (11/11). Much faster than the plan's one-hour estimate.
+- 2026-10-29 · No CMake 4 policy trouble · CMAKE_POLICY_VERSION_MINIMUM=3.5 seed stays as a guard.
+- 2026-10-29 · MuseScore's own SetupCompilerCache.cmake steps aside when CMAKE_*_COMPILER_LAUNCHER is set (CMake warning, expected) · ccache: 1047 misses on the first build, cache 0.6 GB.
+- 2026-10-29 · The installed bundle is not self-contained: rpaths point at ~/Qt/6.10.2/macos/lib and ~/musescore_deps_macos/lib, no Frameworks/ or Qt PlugIns/ in the bundle · fine for a personal build on a machine with the toolchain (the mini must use the same paths); never delete ~/Qt while the agent app is in use. macdeployqt (CI package.sh) would make it standalone; not needed now.
+- 2026-10-29 · Sizes: bundle 266 MB, build.release 5.3 GB (not ~20 GB), 33 GB free after build.
