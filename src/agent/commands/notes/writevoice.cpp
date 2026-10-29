@@ -18,6 +18,8 @@
  */
 #include "writevoice.h"
 
+#include "notehelpers.h"
+
 #include <algorithm>
 #include <functional>
 #include <map>
@@ -118,35 +120,9 @@ std::string where(int bar, int voice)
     return "m" + std::to_string(bar) + " v" + std::to_string(voice);
 }
 
-//! A notation pitch -> what the note stores: concert pitch without any ottava, and both
-//! spellings (NOTATION.md section 2; the inverse of the score printer's spell()).
-struct Stored {
-    int pitch = 0;
-    int tpc1 = Tpc::TPC_INVALID;
-    int tpc2 = Tpc::TPC_INVALID;
-};
-
 Stored store(const Ctx& c, const nt::Pitch& p, const Fraction& tick)
 {
-    static const std::string steps = "CDEFGAB";
-    const int tpc = step2tpc(static_cast<int>(steps.find(p.step)), static_cast<AccidentalVal>(p.alter));
-    Interval v = c.staff->transpose(tick);
-    Stored s;
-    if (c.written) {
-        s.pitch = p.midi() + v.chromatic;
-        s.tpc2 = tpc;
-        s.tpc1 = v.isZero() ? tpc : Transpose::transposeTpc(tpc, v, true);
-    } else {
-        s.pitch = p.midi() - c.staff->pitchOffset(tick);
-        s.tpc1 = tpc;
-        if (v.isZero()) {
-            s.tpc2 = tpc;
-        } else {
-            v.flip();
-            s.tpc2 = Transpose::transposeTpc(tpc, v, true);
-        }
-    }
-    return s;
+    return storePitch(c.staff, p, tick, c.written);
 }
 
 NoteVal noteVal(const Ctx& c, const nt::Pitch& p, const Fraction& tick)
@@ -545,23 +521,9 @@ struct Writer {
     }
 };
 
-//! createAndAddTie (edit.cpp:2027-2050) is file-static; this is the same recipe for two
-//! existing notes, the UI's tie between notes (Score::cmdToggleTie).
 Tie* addTie(Note* start, Note* end)
 {
-    Score* score = start->score();
-    Tie* tie = Factory::createTie(start);
-    tie->setStartNote(start);
-    tie->setTrack(start->track());
-    tie->setTick(start->chord()->segment()->tick());
-    if (end->tieBack()) {
-        score->undoRemoveElement(end->tieBack());
-    }
-    tie->setEndNote(end);
-    tie->setTicks(end->chord()->segment()->tick() - start->chord()->segment()->tick());
-    score->undoAddElement(tie);
-    tie->addTiesToJumpPoints();
-    return tie;
+    return addTieBetween(start, end);
 }
 
 // --- post-condition

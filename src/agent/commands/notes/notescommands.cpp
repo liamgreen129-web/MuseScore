@@ -24,6 +24,7 @@
 #include "registry/commandregistry.h"
 #include "registry/errors.h"
 #include "clearrange.h"
+#include "noteops.h"
 #include "writevoice.h"
 
 using namespace mu::agent;
@@ -62,7 +63,6 @@ Ret writeVoice(const Params& p, WriteContext& ctx)
     ctx.out["annotationsRemoved"] = Val(strings(r.annotationsRemoved));
     ctx.out["tiesRemoved"] = Val(strings(r.tiesRemoved));
     return ret;
-}
 }
 
 //! {measure, beat?} -> BarBeat, or an error naming the argument
@@ -156,10 +156,89 @@ Ret clearRange(const Params& p, WriteContext& ctx)
     ctx.out["bars"] = Val(r.fromBar == r.toBar ? std::to_string(r.fromBar) : std::to_string(r.fromBar) + "-" + std::to_string(r.toBar));
     return ret;
 }
+
+const char* TARGET_DOC = "a handle, or {staff, voice?, measure, beat|offset}: staff is the staff number (as # sN in "
+                         "score_read) or {part, index}; measure the bar by position; beat counts quarter notes from 1; "
+                         "offset is whole notes from the bar's start (\"1/12\") for triplet positions; voice 1-4, default 1";
+
+void addTarget(CommandInfo& c, const std::string& what)
+{
+    c.input["at"] = { DataType::Object, what + ": " + TARGET_DOC, true };
+    c.input["pitch"] = { DataType::String, "sounding (default) or written: how the note names are meant" };
+    c.input["pitch"].enumValues = { "sounding", "written" };
+    c.output["text"] = { DataType::String, "The touched bars of that staff, as score_read prints them" };
+    c.output["bars"] = { DataType::String, "The bars touched, \"3\" or \"3-4\"" };
+}
 }
 
 void mu::agent::registerNotesCommands(CommandRegistry& registry)
 {
+    {
+        CommandInfo c;
+        c.uri = "command://notation/tie";
+        c.name = "tie";
+        c.title = "Tie or untie notes";
+        c.description
+            = "Tie a note (or every note of a chord) to the same pitch in the next event of its voice, as selecting it "
+              "and pressing the tie key does, or remove its tie. note picks one note of a chord by pitch (\"E5\"). "
+              "Refused (nothing changes): a rest; a note already tied (add) or not tied (remove); no next note of that "
+              "pitch, or one that is in another voice or not the next event (write the next note first with "
+              "write_voice; the UI would add a note instead). One undo entry.";
+        c.kind = CommandKind::Write;
+        c.undoName = "Tie";
+        addTarget(c, "The chord whose notes start the tie");
+        c.input["note"] = { DataType::String, "One note of the chord by pitch, e.g. \"E5\" (default: every note)" };
+        c.input["action"] = { DataType::String, "add (default) or remove" };
+        c.input["action"].enumValues = { "add", "remove" };
+        c.output["notes"] = { DataType::Integer, "How many notes were tied or untied" };
+        c.write = [](const Params& p, WriteContext& ctx) { return notes::tie(ctx.score, p, ctx.out); };
+        registry.add(c);
+    }
+    {
+        CommandInfo c;
+        c.uri = "command://notation/tuplet";
+        c.name = "tuplet";
+        c.title = "Make a tuplet";
+        c.description
+            = "Turn a note, chord or rest into a tuplet of the same total length, as the tuplet keys do: the first "
+              "element keeps the pitches, the others are rests to fill with write_voice. ratio \"3:2\" is three in "
+              "the time of two (a quarter becomes an eighth-note triplet). Refused: grace notes, measure repeats, a "
+              "ratio whose unit is not a note value for that length (e.g. 5:3 on a quarter). To write whole "
+              "tuplet passages at once, use write_voice ({3:2 C5:e D5:e E5:e}). One undo entry.";
+        c.kind = CommandKind::Write;
+        c.undoName = "Add tuplet";
+        addTarget(c, "The note, chord or rest that becomes the tuplet");
+        c.input["ratio"] = { DataType::String, "actual:normal, e.g. \"3:2\" or \"5:4\"", true };
+        c.input["numberType"] = { DataType::String, "number (default), ratio or none" };
+        c.input["numberType"].enumValues = { "number", "ratio", "none" };
+        c.input["bracketType"] = { DataType::String, "auto (default), bracket or none" };
+        c.input["bracketType"].enumValues = { "auto", "bracket", "none" };
+        c.output["handle"] = { DataType::String, "Handle of the tuplet's first element" };
+        c.write = [](const Params& p, WriteContext& ctx) { return notes::tuplet(ctx.score, p, ctx.out); };
+        registry.add(c);
+    }
+    {
+        CommandInfo c;
+        c.uri = "command://notation/grace";
+        c.name = "grace";
+        c.title = "Add a grace note";
+        c.description
+            = "Add one grace note to a note or chord, as the grace-note palette does, at the pitch and spelling "
+              "given. Grace notes before the note are added in front of any already there. type: acciaccatura "
+              "(slashed eighth), appoggiatura (eighth), grace4, grace16, grace32 before the note; grace8after, "
+              "grace16after, grace32after after it. Refused: a rest, a grace note as the main note, a pitch outside "
+              "MIDI 0-127. Several grace notes at once: write_voice (g(B4:s C5:s) D5:h). One undo entry.";
+        c.kind = CommandKind::Write;
+        c.undoName = "Add grace note";
+        addTarget(c, "The main note or chord");
+        c.input["type"] = { DataType::String, "The kind of grace note", true };
+        c.input["type"].enumValues = { "acciaccatura", "appoggiatura", "grace4", "grace16", "grace32", "grace8after",
+                                       "grace16after", "grace32after" };
+        c.input["note"] = { DataType::String, "The grace note's pitch, e.g. \"D5\" or \"F#4\"", true };
+        c.output["handle"] = { DataType::String, "Handle of the grace note" };
+        c.write = [](const Params& p, WriteContext& ctx) { return notes::grace(ctx.score, p, ctx.out); };
+        registry.add(c);
+    }
     {
         CommandInfo c;
         c.uri = "command://notation/clear_range";

@@ -1,0 +1,31 @@
+{
+  "id": "N02",
+  "title": "tie, tuplet and grace on existing notes",
+  "source": "specs/notes.md NOTES-TIE-01, NOTES-TU-01, NOTES-GR-01",
+  "fixture": "synthetic/pickup-bar.mscz",
+  "specs": ["specs/notes.md tie, tuplet, grace"],
+  "steps": [
+    {"tool": "write_voice", "writes": true, "args": {"staff": 1, "content": "m2 v1 | C5:h C5:q"}},
+    {
+      "tool": "tie", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 2, "beat": 1}},
+      "expect": {"text": {"contains": "m2(1) v1 | C5:h~ C5:q"}}
+    },
+    {
+      "tool": "tuplet", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 3, "beat": 3}, "ratio": "3:2"},
+      "expect": {"text": {"contains": "m3(2) v1 | G4:h {3:2 F4:e r:e r:e}"}, "handle": {"startswith": "Chord:"}}
+    },
+    {
+      "tool": "grace", "writes": true,
+      "args": {"at": {"staff": {"part": "Flute"}, "measure": 4, "beat": 1}, "type": "acciaccatura", "note": "C#5"},
+      "expect": {"text": {"contains": "m4(3) v1 | g/(C#5:e) B4:h A4:q"}}
+    },
+    {"tool": "tie", "args": {"at": {"staff": 1, "measure": 4, "beat": 1}}, "error": "E_INVALID_ARG", "text": {"contains": "that pitch"}},
+    {"tool": "tuplet", "args": {"at": {"staff": 1, "measure": 5, "beat": 3}, "ratio": "5:3"}, "error": "E_INVALID_ARG"},
+    {"tool": "grace", "args": {"at": {"staff": 1, "measure": 5, "beat": 2}, "type": "grace16", "note": "C5"}, "error": "E_RANGE"},
+    {"assert": "undoIndex", "delta": 4}
+  ],
+  "goldens": [{"format": "musicxml", "path": "goldens/N02_tie_tuplet_grace.musicxml"}],
+  "invariants": {"validate": true, "undoRedo": true}
+}

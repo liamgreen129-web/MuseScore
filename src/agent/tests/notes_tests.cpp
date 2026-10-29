@@ -34,6 +34,7 @@
 #include "engraving/tests/utils/scorerw.h"
 
 #include "commands/notes/clearrange.h"
+#include "commands/notes/noteops.h"
 #include "commands/notes/writevoice.h"
 #include "engraving/dom/selectionfilter.h"
 #include "core/transaction.h"
@@ -577,4 +578,180 @@ TEST_F(Agent_WriteVoice, ClearRefusesBeforeChangingAnything)
         EXPECT_EQ(s->undoStack()->currentIndex(), idx) << c.expect;
         EXPECT_EQ(print(s.get(), 1), before) << c.expect;
     }
+}
+
+// --- tie, tuplet, grace (NOTES-TIE, NOTES-TU, NOTES-GR)
+
+namespace {
+using muse::Val;
+using muse::ValMap;
+
+Outcome runOp(MasterScore* score, muse::Ret (*op)(MasterScore*, const Params&, notes::Out&), const Params& p,
+              notes::Out* out = nullptr)
+{
+    MScore::setError(MsError::MS_NO_ERROR);
+    core::ScoreUndoBackend backend(score);
+    core::Transaction tx(score, backend);
+    Outcome o;
+    notes::Out res;
+    o.ret = tx.begin("Agent: op");
+    if (o.ret) {
+        o.ret = tx.step("op", [&] { return op(score, p, res); });
+    }
+    if (o.ret) {
+        o.ret = tx.commit();
+        o.changed = tx.changed();
+    }
+    if (out) {
+        *out = res;
+    }
+    return o;
+}
+
+Val at(int staff, int bar, double beat, int voice = 1)
+{
+    ValMap m;
+    m["staff"] = Val(staff);
+    m["measure"] = Val(bar);
+    m["beat"] = Val(beat);
+    m["voice"] = Val(voice);
+    return Val(m);
+}
+
+void expectRefused(MasterScore* s, muse::Ret (*op)(MasterScore*, const Params&, notes::Out&), const Params& p,
+                   const std::string& expect)
+{
+    const std::string before = print(s, 1);
+    const size_t idx = s->undoStack()->currentIndex();
+    Outcome o = runOp(s, op, p);
+    EXPECT_FALSE(o.ret) << expect;
+    EXPECT_TRUE(has(o.ret.text(), expect)) << expect << " -> " << o.ret.text();
+    EXPECT_EQ(s->undoStack()->currentIndex(), idx) << expect;
+    EXPECT_EQ(print(s, 1), before) << expect;
+}
+}
+
+// TIE-01/02/05: tie neighbouring same pitches, across the bar line, then remove a tie
+TEST_F(Agent_WriteVoice, TieAddAndRemove)
+{
+    auto s = open("pickup-bar.mscz");
+    ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | C5:h C5:q\nm3 v1 | C5:h. ").ret);
+    notes::Out out;
+    Outcome o = runOp(s.get(), notes::tie, { { "at", at(1, 2, 1) } }, &out);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(s.get(), 1, 2, 2), "m2(1) v1 | C5:h~ C5:q\n")) << print(s.get(), 1, 2, 2);
+    o = runOp(s.get(), notes::tie, { { "at", at(1, 2, 3) }, { "note", Val("C5") } }, &out);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_EQ(out["bars"].toString(), "2-3");
+    EXPECT_TRUE(has(print(s.get(), 1, 2, 2), "m2(1) v1 | C5:h~ C5:q~\n")) << print(s.get(), 1, 2, 2);
+    o = runOp(s.get(), notes::tie, { { "at", at(1, 2, 1) }, { "action", Val("remove") } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(s.get(), 1, 2, 2), "m2(1) v1 | C5:h C5:q~\n")) << print(s.get(), 1, 2, 2);
+    undo(s.get());
+    EXPECT_TRUE(has(print(s.get(), 1, 2, 2), "m2(1) v1 | C5:h~ C5:q~\n")) << print(s.get(), 1, 2, 2);
+}
+
+// TIE-03/04 and the other refusals: nothing changes, no notes are added
+TEST_F(Agent_WriteVoice, TieRefusals)
+{
+    auto s = open("pickup-bar.mscz");
+    ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | [C5,E5]:h C5:q\nm3 v1 | D5:h r:q").ret);
+    ASSERT_TRUE(runWrite(s.get(), 1, "m4 v1 | B4:h A4:q\nm4 v2 | _:h B4:q").ret);
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 2, 1) } }, "E5");                          // chord: E5 has no partner
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 2, 3) } }, "has that pitch");             // next bar has no C5
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 3, 3) } }, "is a rest");
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 2, 1) }, { "note", Val("G5") } }, "has no G5");
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 2, 1) }, { "note", Val("C5") }, { "action", Val("remove") } }, "not tied");
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 2, 1) }, { "action", Val("toggle") } }, "add or remove");
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 4, 1) } }, "another voice");             // next B4 only in voice 2
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 2, 2) } }, "no note or rest starts");
+    expectRefused(s.get(), notes::tie, { { "at", at(9, 2, 1) } }, "outside 1-1");
+    expectRefused(s.get(), notes::tie, {}, "missing at");
+    ASSERT_TRUE(runOp(s.get(), notes::tie, { { "at", at(1, 2, 1) }, { "note", Val("C5") } }).ret);
+    expectRefused(s.get(), notes::tie, { { "at", at(1, 2, 1) }, { "note", Val("C5") } }, "already tied");
+}
+
+// TU-01/02/03: a quarter becomes a triplet, a half becomes 5:4 keeping its pitch; an impossible unit is refused
+TEST_F(Agent_WriteVoice, TupletFromNote)
+{
+    auto s = open("pickup-bar.mscz");
+    notes::Out out;
+    Outcome o = runOp(s.get(), notes::tuplet, { { "at", at(1, 2, 3) }, { "ratio", Val("3:2") } }, &out);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(s.get(), 1, 2, 2), "m2(1) v1 | E4:h {3:2 D4:e r:e r:e}\n")) << print(s.get(), 1, 2, 2);
+    EXPECT_TRUE(has(out["handle"].toString(), "Chord:")) << out["handle"].toString();
+    o = runOp(s.get(), notes::tuplet, { { "at", at(1, 3, 1) }, { "ratio", Val("5:4") }, { "numberType", Val("ratio") } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(s.get(), 1, 3, 3), "m3(2) v1 | {5:4 G4:e r:e r:e r:e r:e} F4:q\n")) << print(s.get(), 1, 3, 3);
+    undo(s.get());
+    EXPECT_TRUE(has(print(s.get(), 1, 3, 3), "m3(2) v1 | G4:h F4:q\n")) << print(s.get(), 1, 3, 3);
+
+    ASSERT_TRUE(runWrite(s.get(), 1, "m4 v1 | B4:q. A4:e r:q").ret);
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 4, 3) }, { "ratio", Val("5:3") } }, "not a note value");
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 4, 3) }, { "ratio", Val("3") } }, "actual:normal");
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 4, 3) }, { "ratio", Val("1:2") } }, "actual:normal");
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 4, 3) }, { "ratio", Val("3:2") }, { "bracketType", Val("x") } },
+                  "bracketType");
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 4, 3) }, { "ratio", Val("3:2") }, { "numberType", Val("x") } },
+                  "numberType");
+}
+
+// GR-01/02/03/04: graces before (order: newest in front) and after, spelling as given, refusals
+TEST_F(Agent_WriteVoice, GraceNotesOneAtATime)
+{
+    auto s = open("pickup-bar.mscz");
+    notes::Out out;
+    Outcome o = runOp(s.get(), notes::grace, { { "at", at(1, 2, 1) }, { "type", Val("acciaccatura") }, { "note", Val("Fb4") } }, &out);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(out["handle"].toString(), "Note:")) << out["handle"].toString();
+    o = runOp(s.get(), notes::grace, { { "at", at(1, 2, 1) }, { "type", Val("acciaccatura") }, { "note", Val("D4") } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    o = runOp(s.get(), notes::grace, { { "at", at(1, 2, 3) }, { "type", Val("grace16after") }, { "note", Val("C#4") } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(s.get(), 1, 2, 2), "m2(1) v1 | g/(D4:e Fb4:e) E4:h D4:q ga(C#4:s)\n")) << print(s.get(), 1, 2, 2);
+
+    auto t = open("transposing-instruments.mscz");
+    o = runOp(t.get(), notes::grace, { { "at", at(2, 1, 1) }, { "type", Val("grace16") }, { "note", Val("B3") }, { "pitch", Val("written") } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(t.get(), 2, 1, 1, true), "m1 v1 | g(B3:s) D4:q")) << print(t.get(), 2, 1, 1, true);
+    EXPECT_TRUE(has(print(t.get(), 2, 1, 1, false), "m1 v1 | g(A3:s) C4:q")) << print(t.get(), 2, 1, 1, false);
+
+    ASSERT_TRUE(runWrite(s.get(), 1, "m4 v1 | B4:h r:q").ret);
+    expectRefused(s.get(), notes::grace, { { "at", at(1, 4, 3) }, { "type", Val("grace16") }, { "note", Val("C5") } }, "is a rest");
+    expectRefused(s.get(), notes::grace, { { "at", at(1, 4, 1) }, { "type", Val("grace64") }, { "note", Val("C5") } }, "type must be");
+    expectRefused(s.get(), notes::grace, { { "at", at(1, 4, 1) }, { "type", Val("grace16") }, { "note", Val("H5") } }, "note must be");
+    expectRefused(s.get(), notes::grace, { { "at", at(1, 4, 1) }, { "type", Val("grace16") }, { "note", Val("A9") } }, "0-127");
+}
+
+// addresses: staff by part name, unknown keys, handles that went stale
+TEST_F(Agent_WriteVoice, SharedAddresses)
+{
+    auto s = open("transposing-instruments.mscz");
+    ValMap byPart;
+    byPart["part"] = Val("horn in f");
+    ValMap a;
+    a["staff"] = Val(byPart);
+    a["measure"] = Val(1);
+    a["beat"] = Val(2);
+    notes::Out out;
+    Outcome o = runOp(s.get(), notes::tuplet, { { "at", Val(a) }, { "ratio", Val("3:2") } }, &out);
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(s.get(), 3, 1, 1), "m1 v1 | C4:q {3:2 D4:e r:e r:e} E4:q F4:q\n")) << print(s.get(), 3, 1, 1);
+    const std::string handle = out["handle"].toString();
+    o = runOp(s.get(), notes::grace, { { "at", Val(handle) }, { "type", Val("grace16") }, { "note", Val("C4") } });
+    EXPECT_TRUE(o.ret) << o.ret.text();
+
+    a["colour"] = Val("red");
+    expectRefused(s.get(), notes::tuplet, { { "at", Val(a) }, { "ratio", Val("3:2") } }, "unknown key 'colour'");
+    byPart["part"] = Val("Tuba");
+    ValMap b;
+    b["staff"] = Val(byPart);
+    b["measure"] = Val(1);
+    b["beat"] = Val(1);
+    expectRefused(s.get(), notes::tuplet, { { "at", Val(b) }, { "ratio", Val("3:2") } }, "no part named");
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 1, 1.0001) }, { "ratio", Val("3:2") } }, "does not fall on a tick");
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 1, 9) }, { "ratio", Val("3:2") } }, "past its end");
+    expectRefused(s.get(), notes::tuplet, { { "at", at(1, 1, 1, 5) }, { "ratio", Val("3:2") } }, "voice must be 1-4");
+    ASSERT_TRUE(runWrite(s.get(), 3, "m1 v1 | C4:w").ret);
+    expectRefused(s.get(), notes::grace, { { "at", Val(handle) }, { "type", Val("grace16") }, { "note", Val("C4") } }, "E_STALE_HANDLE");
 }

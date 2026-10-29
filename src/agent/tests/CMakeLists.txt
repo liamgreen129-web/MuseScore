@@ -21,6 +21,7 @@ set(MODULE_TEST_LINK
     agent_read
     agent_core
     agent_notes
+    agent_address
     engraving
 )
 
