@@ -1,0 +1,147 @@
+{
+  "id": "EM04",
+  "title": "Breath marks and caesuras after notes",
+  "source": "P2.4 expression-marks (EXM-BR-01, -02, -04)",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/expression-marks.md add_breath"
+  ],
+  "steps": [
+    {
+      "tool": "add_breath",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "after": {
+          "measure": 3,
+          "beat": 4
+        }
+      },
+      "expect": {
+        "status": "added",
+        "notation": {
+          "contains": "C#5:q+br"
+        }
+      }
+    },
+    {
+      "tool": "add_breath",
+      "writes": true,
+      "args": {
+        "breath": "caesura",
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "after": {
+          "measure": 2,
+          "beat": 2
+        }
+      },
+      "expect": {
+        "status": "added"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 3,
+        "staves": [
+          1,
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3(2) v1 | C#5:q B4:q A4:q+ferm C#5:q+br"
+            },
+            {
+              "contains": "G#3:q+cae"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_breath",
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "after": {
+          "measure": 3,
+          "beat": 4
+        }
+      },
+      "expect": {
+        "status": "unchanged",
+        "changed": false
+      }
+    },
+    {
+      "tool": "add_breath",
+      "writes": true,
+      "args": {
+        "breath": "tick",
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "after": {
+          "measure": 3,
+          "beat": 4
+        }
+      },
+      "expect": {
+        "status": "replaced"
+      },
+      "note": "one mark per slot, never two"
+    },
+    {
+      "tool": "add_breath",
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "after": {
+          "measure": 3,
+          "beat": 1.5
+        }
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "add_breath",
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "after": {
+          "measure": 3,
+          "beat": 1
+        },
+        "pause": -1
+      },
+      "error": "E_INVALID_ARG"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EM04_breath.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

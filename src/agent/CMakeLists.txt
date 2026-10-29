@@ -107,6 +107,10 @@ target_sources(agent PRIVATE
     commands/session/sessioncommands.h
     commands/test/testcommands.cpp
     commands/test/testcommands.h
+    commands/expression-marks/expressionmarks.cpp
+    commands/expression-marks/expressionmarks.h
+    commands/expression-marks/expressionmarkscommands.h
+    commands/expression-marks/register.cpp
 
     writes/notationundobackend.cpp
     writes/notationundobackend.h

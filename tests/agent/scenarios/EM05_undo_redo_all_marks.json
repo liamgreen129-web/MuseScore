@@ -1,0 +1,363 @@
+{
+  "id": "EM05",
+  "title": "Undo and redo each expression mark, singly and as one batch",
+  "source": "P2.4 expression-marks undo/redo round trip",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/expression-marks.md add_dynamic",
+    "specs/expression-marks.md add_hairpin",
+    "specs/expression-marks.md add_articulation",
+    "specs/expression-marks.md add_ornament",
+    "specs/expression-marks.md add_fermata",
+    "specs/expression-marks.md add_breath"
+  ],
+  "requires": [
+    "undo",
+    "redo"
+  ],
+  "steps": [
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "p"
+      }
+    },
+    {
+      "tool": "add_hairpin",
+      "writes": true,
+      "args": {
+        "kind": "cresc",
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "from": {
+          "measure": 2,
+          "beat": 1
+        },
+        "to": {
+          "measure": 2,
+          "beat": 3
+        }
+      }
+    },
+    {
+      "tool": "add_articulation",
+      "writes": true,
+      "args": {
+        "articulation": "tenuto",
+        "staff": {
+          "part": "Alto",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        }
+      }
+    },
+    {
+      "tool": "add_ornament",
+      "writes": true,
+      "args": {
+        "ornament": "turn",
+        "staff": {
+          "part": "Tenor",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 2
+        }
+      }
+    },
+    {
+      "tool": "add_fermata",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 4
+        }
+      }
+    },
+    {
+      "tool": "add_breath",
+      "writes": true,
+      "args": {
+        "breath": "comma",
+        "staff": {
+          "part": "Alto",
+          "index": 1
+        },
+        "after": {
+          "measure": 2,
+          "beat": 4
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "A4:q+p+<"
+            },
+            {
+              "contains": "F#4:q+ten"
+            },
+            {
+              "contains": "B3:q+turn"
+            },
+            {
+              "contains": "G#3:q+ferm"
+            },
+            {
+              "contains": "E4:q+br"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "batch",
+      "writes": true,
+      "args": {
+        "name": "All six marks",
+        "operations": [
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Soprano",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_hairpin",
+            "args": {
+              "kind": "cresc",
+              "staff": {
+                "part": "Soprano",
+                "index": 1
+              },
+              "from": {
+                "measure": 2,
+                "beat": 1
+              },
+              "to": {
+                "measure": 2,
+                "beat": 3
+              }
+            }
+          },
+          {
+            "command": "add_articulation",
+            "args": {
+              "articulation": "tenuto",
+              "staff": {
+                "part": "Alto",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              }
+            }
+          },
+          {
+            "command": "add_ornament",
+            "args": {
+              "ornament": "turn",
+              "staff": {
+                "part": "Tenor",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 2
+              }
+            }
+          },
+          {
+            "command": "add_fermata",
+            "args": {
+              "staff": {
+                "part": "Bass",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 4
+              }
+            }
+          },
+          {
+            "command": "add_breath",
+            "args": {
+              "breath": "comma",
+              "staff": {
+                "part": "Alto",
+                "index": 1
+              },
+              "after": {
+                "measure": 2,
+                "beat": 4
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 1
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "A4:q+p+<"
+            },
+            {
+              "contains": "F#4:q+ten"
+            },
+            {
+              "contains": "B3:q+turn"
+            },
+            {
+              "contains": "G#3:q+ferm"
+            },
+            {
+              "contains": "E4:q+br"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EM05_undo_redo_all_marks.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Every $undo/$redo is compared byte for byte (mscz) with the export recorded at that undo index."
+  ]
+}

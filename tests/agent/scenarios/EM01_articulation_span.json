@@ -1,0 +1,180 @@
+{
+  "id": "EM01",
+  "title": "Staccato over a span, duplicates left alone",
+  "source": "P2.4 expression-marks (EXM-ART-01, -02, -06)",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/expression-marks.md add_articulation"
+  ],
+  "steps": [
+    {
+      "tool": "add_articulation",
+      "writes": true,
+      "args": {
+        "articulation": "staccato",
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "through": {
+          "measure": 2,
+          "beat": 2
+        }
+      },
+      "expect": {
+        "added": 2,
+        "unchanged": 0,
+        "notation": {
+          "contains": "A4:q+st B4:q+st"
+        }
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | A4:q+st B4:q+st C#5:q+ferm E5:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_articulation",
+      "args": {
+        "articulation": "st",
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        }
+      },
+      "expect": {
+        "added": 0,
+        "unchanged": 1,
+        "changed": false
+      },
+      "note": "same mark again (notation code): left alone, no undo entry"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 1
+    },
+    {
+      "tool": "add_articulation",
+      "writes": true,
+      "args": {
+        "articulation": "accent",
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "voice": 1,
+        "at": {
+          "measure": 2,
+          "beat": 4
+        }
+      },
+      "expect": {
+        "added": 1
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "G#3:q+ac"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_articulation",
+      "args": {
+        "articulation": "tenuto",
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "through": {
+          "measure": 2,
+          "beat": 1
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "through before at"
+    },
+    {
+      "tool": "add_articulation",
+      "args": {
+        "articulation": "wobble",
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "not in the enum"
+    },
+    {
+      "tool": "add_articulation",
+      "args": {
+        "articulation": "tenuto",
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1.5
+        }
+      },
+      "error": "E_RANGE",
+      "note": "no note at beat 1.5"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EM01_articulation_span.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

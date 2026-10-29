@@ -1,0 +1,133 @@
+{
+  "id": "EM02",
+  "title": "Ornament symbols on notes",
+  "source": "P2.4 expression-marks (EXM-ORN-01, -02, -03)",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/expression-marks.md add_ornament"
+  ],
+  "steps": [
+    {
+      "tool": "add_ornament",
+      "writes": true,
+      "args": {
+        "ornament": "mordent",
+        "staff": {
+          "part": "Alto",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        }
+      },
+      "expect": {
+        "added": 1
+      }
+    },
+    {
+      "tool": "add_ornament",
+      "writes": true,
+      "args": {
+        "ornament": "tr",
+        "staff": {
+          "part": "Tenor",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        }
+      },
+      "expect": {
+        "added": 1
+      },
+      "note": "the trill symbol, not a trill line"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 3,
+        "staves": [
+          2,
+          3
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | F#4:q+mord"
+            },
+            {
+              "contains": "m3(2) v1 | A3:e+tr"
+            },
+            {
+              "notContains": "trl["
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_ornament",
+      "args": {
+        "ornament": "mordent",
+        "staff": {
+          "part": "Alto",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        }
+      },
+      "expect": {
+        "unchanged": 1,
+        "changed": false
+      }
+    },
+    {
+      "tool": "add_ornament",
+      "args": {
+        "ornament": "turn",
+        "staff": {
+          "part": "Alto",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1.5
+        }
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "add_ornament",
+      "args": {
+        "ornament": "turn",
+        "staff": {
+          "part": "Piccolo",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        }
+      },
+      "error": "E_RANGE",
+      "note": "no such part"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EM02_ornament.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

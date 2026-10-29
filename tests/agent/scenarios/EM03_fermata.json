@@ -1,0 +1,218 @@
+{
+  "id": "EM03",
+  "title": "Fermatas: one note, every staff, replace, barline",
+  "source": "P2.4 expression-marks (EXM-FER-01, -03, -04, -05, -06, -07)",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/expression-marks.md add_fermata"
+  ],
+  "steps": [
+    {
+      "tool": "add_fermata",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        }
+      },
+      "expect": {
+        "status": "added"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "A3:q+ferm G#3:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_fermata",
+      "writes": true,
+      "args": {
+        "fermata": "short",
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        }
+      },
+      "expect": {
+        "status": "replaced"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "A3:q+ferm:short"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_fermata",
+      "args": {
+        "fermata": "short",
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        }
+      },
+      "expect": {
+        "status": "unchanged",
+        "changed": false
+      }
+    },
+    {
+      "tool": "add_fermata",
+      "writes": true,
+      "args": {
+        "all_staves": true,
+        "at": {
+          "measure": 3,
+          "beat": 3
+        }
+      },
+      "expect": {
+        "handles": {
+          "len": 4
+        }
+      },
+      "note": "the soprano already has one there; the other three get one"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 3,
+        "staves": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "A4:q+ferm C#5:q"
+            },
+            {
+              "contains": "E4:q+ferm G#4:q"
+            },
+            {
+              "contains": "C#4:q+ferm C#4:q"
+            },
+            {
+              "contains": "A2:q+ferm E#3:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_fermata",
+      "writes": true,
+      "args": {
+        "barline": 4,
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        }
+      },
+      "expect": {
+        "status": "added"
+      }
+    },
+    {
+      "tool": "add_fermata",
+      "args": {
+        "barline": 99,
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        }
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "add_fermata",
+      "args": {
+        "all_staves": true,
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 3
+        }
+      },
+      "error": "E_INVALID_ARG"
+    },
+    {
+      "tool": "add_fermata",
+      "args": {
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "time_stretch": 0
+      },
+      "error": "E_INVALID_ARG"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EM03_fermata.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "A barline fermata does not change playback (score.cpp:572-579, spec Q11) and has no notation code; it is checked only through the golden."
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "id": "EM06",
+  "title": "Dynamic in voice 2, cresc. line, hairpin overlap refused",
+  "source": "P2.4 expression-marks (EXM-DYN-02, EXM-HP-04)",
+  "fixture": "synthetic/voices-four.mscz",
+  "specs": [
+    "specs/expression-marks.md add_dynamic",
+    "specs/expression-marks.md add_hairpin"
+  ],
+  "steps": [
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "voice": 2,
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "dynamic": "mp",
+        "voice_assignment": "this_voice"
+      },
+      "expect": {
+        "status": "added",
+        "voiceAssignment": "this_voice"
+      }
+    },
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "voice": 2,
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "dynamic": "f",
+        "velocity": 100,
+        "voice_assignment": "this_voice"
+      },
+      "expect": {
+        "status": "replaced",
+        "dynamic": "f"
+      },
+      "note": "replace in place with a velocity; the undo invariant checks the mp and its velocity come back byte for byte"
+    },
+    {
+      "tool": "add_hairpin",
+      "writes": true,
+      "args": {
+        "kind": "cresc_line",
+        "staff": {
+          "number": 1
+        },
+        "from": {
+          "measure": 2,
+          "beat": 1
+        },
+        "to": {
+          "measure": 2,
+          "beat": 3
+        }
+      },
+      "expect": {
+        "notation": {
+          "contains": "<\"cresc.\""
+        }
+      }
+    },
+    {
+      "tool": "add_hairpin",
+      "args": {
+        "kind": "dim",
+        "staff": {
+          "number": 1
+        },
+        "from": {
+          "measure": 2,
+          "beat": 2
+        },
+        "to": {
+          "measure": 3,
+          "beat": 1
+        }
+      },
+      "error": "E_EXISTS"
+    },
+    {
+      "tool": "add_dynamic",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "voice": 2,
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "dynamic": "ff",
+        "voice_assignment": "this_voice",
+        "if_exists": "error"
+      },
+      "error": "E_EXISTS"
+    },
+    {
+      "tool": "add_dynamic",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "dolce"
+      },
+      "error": "E_INVALID_ARG"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EM06_voices_hairpin_line.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

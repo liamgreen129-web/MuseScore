@@ -113,7 +113,7 @@
         },
         "dynamic": "p"
       },
-      "error": "E_NO_CHORDREST",
+      "error": "E_RANGE",
       "note": "no note at beat 1.5"
     }
   ],
@@ -130,6 +130,7 @@
   "questions": [
     "expression-marks.md uses $ref #/defs/staffRef and #/defs/position but never defines them; assumed staff {part, index (1-based)} and at {measure, beat (1-based)} as in text.md 0.6/add_text.",
     "measure: assumed positional bar (m-number of NOTATION.md, pickup = m1), as write_voice says; expression-marks/text never say positional or displayed.",
-    "Write commands' output field for 'compact notation of the touched bars' is not named in any spec; scenarios verify with a score_read step instead."
+    "Write commands' output field for 'compact notation of the touched bars' is not named in any spec; scenarios verify with a score_read step instead.",
+    "P2.4: no note at the position is E_RANGE (the spec's E_NO_CHORDREST is proposed, not in errors.h yet); add_dynamic returns the bar's notation as `notation`."
   ]
 }
