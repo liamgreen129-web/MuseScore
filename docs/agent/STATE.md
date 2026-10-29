@@ -10,5 +10,5 @@ Updated by the conductor at the end of every session and before every STOP.
 - **Blockers:**
   1. Liam to update the daily app 4.7.4 → 4.7.6.
   2. Liam to decide the CLAUDE.md rule 4 rewording (DECISIONS 2026-10-29).
-- **Background jobs:** api-scouts for expression-marks, instrumentation, style-layout, read → `docs/agent/specs/` (notes, expression-lines, structure, text, pitch, generic done; session to go)
+- **Background jobs:** api-scouts for expression-marks, style-layout, read, session → `docs/agent/specs/` (notes, expression-lines, structure, text, pitch, generic, instrumentation done)
 - **Worktrees in use:** none
