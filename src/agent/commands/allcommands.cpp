@@ -19,10 +19,12 @@
 #include "allcommands.h"
 
 #include "app/appcommands.h"
+#include "read/readcommands.h"
 
 //! The one list of command groups. Only the conductor edits this file, at merge time
 //! (PLAN.md, build-tree rules), so parallel implementers never conflict here.
 void mu::agent::registerAllCommands(CommandRegistry& registry)
 {
     registerAppCommands(registry);
+    registerReadCommands(registry);
 }

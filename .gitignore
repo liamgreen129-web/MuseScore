@@ -91,3 +91,4 @@ g0-snapshot/
 tests/fixtures/corpus/
 build.tests/
 test.log
+.claude/worktrees/

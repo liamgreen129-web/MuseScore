@@ -152,7 +152,10 @@ void StartupScenario::runAfterSplashScreen()
 
     StartupModeType modeType = resolveStartupModeType();
     if (multiwindowsProvider()->windowCount() == 1 && sessionsManager()->hasProjectsForRestore()) {
-        modeType = StartupModeType::Recovery;
+        // AGENT: no "The previous session quit unexpectedly" prompt in MuseScore Agent: it came up on
+        // every launch after a forced quit and replaced opening the requested score. Forget the old
+        // session but keep each project's autosaved changes, so reopening a file still offers them.
+        sessionsManager()->reset();
     }
 
     muse::async::Channel<Uri> opened = interactive()->opened();

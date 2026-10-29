@@ -25,6 +25,8 @@
 #include "muse_framework_config.h"
 #include "global/iglobalconfiguration.h"
 #include "project/inotationproject.h"
+#include "notation/imasternotation.h"
+#include "notation/internal/inotationundostack.h"
 
 #include "commands/allcommands.h"
 #include "discovery/discoveryrecords.h"
@@ -123,13 +125,30 @@ void AgentService::watchCurrentProject()
         return;
     }
 
-    m_env.globalContext()->currentProjectChanged().onNotify(this, [this]() {
+    auto subscribe = [this]() {
         writeDiscoveryRecord();
-        if (const mu::project::INotationProjectPtr project = m_env.globalContext()->currentProject()) {
-            project->pathChanged().onNotify(this, [this]() { writeDiscoveryRecord(); });
-            project->displayNameChanged().onNotify(this, [this]() { writeDiscoveryRecord(); });
+        const mu::project::INotationProjectPtr project = m_env.globalContext()->currentProject();
+        if (!project) {
+            return;
         }
-    });
+        project->pathChanged().onNotify(this, [this]() { writeDiscoveryRecord(); });
+        project->displayNameChanged().onNotify(this, [this]() { writeDiscoveryRecord(); });
+        if (const mu::notation::IMasterNotationPtr master = project->masterNotation()) {
+            if (const mu::notation::INotationUndoStackPtr undo = master->notation() ? master->notation()->undoStack() : nullptr) {
+                undo->changesChannel().onReceive(this, [this](const mu::engraving::ScoreChanges& c) {
+                    // copy ticks and staff indices only; the record's pointers die with the callback
+                    ChangeRecord r;
+                    r.tickFrom = c.tickFrom;
+                    r.tickTo = c.tickTo;
+                    r.staffFrom = c.staffIdxFrom == muse::nidx ? -1 : static_cast<int>(c.staffIdxFrom);
+                    r.staffTo = c.staffIdxTo == muse::nidx ? -1 : static_cast<int>(c.staffIdxTo);
+                    m_env.changes.add(r);
+                });
+            }
+        }
+    };
+    m_env.globalContext()->currentProjectChanged().onNotify(this, subscribe);
+    subscribe(); // a score may already be open (opened with the app)
 }
 
 void AgentService::writeDiscoveryRecord()

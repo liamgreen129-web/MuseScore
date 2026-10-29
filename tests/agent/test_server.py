@@ -81,8 +81,9 @@ class App:
 
     def __init__(self, bundle, env=None, args=None):
         before = agent_pids()
-        args_ = ["open", "-n", "-g"]
-        for k, v in (env or {}).items():
+        args_ = ["open", "-n", "-g", "-j"]  # -j: launch hidden, so it never covers the user's windows
+        env = dict({"MUSESCORE_AGENT_BACKGROUND": "1"}, **(env or {}))  # never cover the user's windows
+        for k, v in env.items():
             args_ += ["--env", f"{k}={v}"]
         subprocess.run(args_ + ["-a", str(bundle)] + list(args or []), check=True)
         self.pid = None

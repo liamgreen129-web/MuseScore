@@ -25,7 +25,7 @@ fi
 
 rm -rf "$DEST"
 ditto "$SRC" "$DEST"
-codesign --force --deep --sign - "$DEST"
+"$ROOT/scripts/sign.sh" "$DEST"
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 "$LSREGISTER" -f "$DEST"

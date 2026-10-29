@@ -44,6 +44,10 @@ target_sources(agent PRIVATE
     commands/allcommands.h
     commands/app/appcommands.cpp
     commands/app/appcommands.h
+    commands/read/readcommands.cpp
+    commands/read/readcommands.h
+
+    platform/background.h
 
     server/itransport.h
     server/mcptypes.h
@@ -58,6 +62,14 @@ target_sources(agent PRIVATE
 target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read)
 
 target_compile_definitions(agent PRIVATE AGENT_BUNDLE_ID="${MUSE_APP_GUI_IDENTIFIER}")
+
+if (OS_IS_MAC)
+    target_sources(agent PRIVATE platform/background_mac.mm)
+    set_source_files_properties(platform/background_mac.mm PROPERTIES SKIP_PRECOMPILE_HEADERS ON) # the PCH is C++ only
+    target_link_libraries(agent PRIVATE "-framework AppKit")
+else()
+    target_sources(agent PRIVATE platform/background_other.cpp)
+endif()
 
 if (MUSE_ENABLE_UNIT_TESTS)
     add_subdirectory(tests)

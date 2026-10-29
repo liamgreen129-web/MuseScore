@@ -47,4 +47,5 @@ bash ./ninja_build.sh -t installrelwithdebinfo -j "$AGENT_JOBS" "$@"
 
 echo "== $(date) build done"
 ccache --show-stats | head -12
+scripts/sign.sh agent.install/*.app
 scripts/check-identity.sh

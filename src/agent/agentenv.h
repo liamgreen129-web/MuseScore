@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include <deque>
 #include <string>
 
 #include "modularity/ioc.h"
@@ -27,6 +28,32 @@
 #include "multiwindows/internal/multiprocess/imultiprocessprovider.h"
 
 namespace mu::agent {
+//! One committed change to the score, as published by the undo stack (ScoreChanges).
+//! Ticks, not pointers: nothing here outlives the request (CLAUDE.md rule 2).
+struct ChangeRecord {
+    long long version = 0;
+    int tickFrom = -1;
+    int tickTo = -1;
+    int staffFrom = -1; // 0-based, -1 = unknown
+    int staffTo = -1;
+};
+
+//! stateVersion: a counter owned by the agent, bumped on every published change
+//! (read and session specs: the undo index repeats after undo + new edit, so it can't be used).
+struct ChangeLog {
+    long long version = 0;
+    std::deque<ChangeRecord> records; // newest last, at most `capacity`
+    size_t capacity = 1000;
+    void add(ChangeRecord r)
+    {
+        r.version = ++version;
+        records.push_back(r);
+        while (records.size() > capacity) {
+            records.pop_front();
+        }
+    }
+};
+
 //! What a command handler may use. Handlers get the services through this object only,
 //! never by holding pointers between requests (CLAUDE.md rule 2).
 class AgentEnv : public muse::Contextable
@@ -42,5 +69,6 @@ public:
 
     int port = 0;
     long long pid = 0;
+    ChangeLog changes;
 };
 }

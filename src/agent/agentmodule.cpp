@@ -21,6 +21,9 @@
 #include <cstdlib>
 
 #include "agentservice.h"
+#include "platform/background.h"
+
+#include <QTimer>
 
 #include "log.h"
 
@@ -59,6 +62,15 @@ void AgentContext::onAllInited(const IApplication::RunMode& mode)
     if (const char* off = std::getenv("MUSESCORE_AGENT_DISABLE"); off && std::string(off) == "1") {
         LOGI() << "agent server disabled by MUSESCORE_AGENT_DISABLE=1";
         return;
+    }
+
+    if (backgroundModeRequested()) {
+        // test launches: never cover the user's windows. Again shortly after, because the
+        // main window is shown (and the app activated) after all modules are inited.
+        enterBackgroundMode();
+        for (int ms : { 500, 2000, 5000 }) {
+            QTimer::singleShot(ms, []() { enterBackgroundMode(); });
+        }
     }
 
     m_service = std::make_unique<AgentService>(iocContext());
