@@ -99,4 +99,4 @@ From DECISIONS, P1.5:
 
 ## Sign-off
 
-- [ ] Liam: G1 accepted, go to Phase 2 (P2.1 transaction core, then the `core-v1` freeze).
+- [x] Liam: G1 accepted (2026-10-29, in chat), go to Phase 2 (P2.1 transaction core, then the `core-v1` freeze).

@@ -23,6 +23,24 @@ target_sources(agent_read PRIVATE
 )
 target_link_libraries(agent_read PUBLIC agent_notation engraving)
 
+# The transaction core (P2.1, frozen as core-v1): transactions, selection guard, handles,
+# post-condition checks. Engraving only, so it is unit-tested without the app.
+muse_create_module(agent_core NO_UNITY)
+target_sources(agent_core PRIVATE
+    core/handles.cpp
+    core/handles.h
+    core/postconditions.cpp
+    core/postconditions.h
+    core/selectionguard.cpp
+    core/selectionguard.h
+    core/transaction.cpp
+    core/transaction.h
+    core/undobackend.cpp
+    core/undobackend.h
+)
+target_include_directories(agent_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(agent_core PUBLIC engraving)
+
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 
 target_sources(agent PRIVATE
@@ -47,6 +65,15 @@ target_sources(agent PRIVATE
     commands/read/readcommands.cpp
     commands/read/exportcommands.cpp
     commands/read/readcommands.h
+    commands/session/sessioncommands.cpp
+    commands/session/sessioncommands.h
+    commands/test/testcommands.cpp
+    commands/test/testcommands.h
+
+    writes/notationundobackend.cpp
+    writes/notationundobackend.h
+    writes/writerunner.cpp
+    writes/writerunner.h
 
     platform/background.h
 
@@ -60,7 +87,7 @@ target_sources(agent PRIVATE
     server/tokenstore.h
 )
 
-target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read)
+target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core)
 
 target_compile_definitions(agent PRIVATE AGENT_BUNDLE_ID="${MUSE_APP_GUI_IDENTIFIER}")
 

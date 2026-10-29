@@ -30,6 +30,10 @@
 //! InputSchema, Availability) so the set can move onto rcommand when rebased onto 5.0.
 //! Differences: arguments can be required, have an enum, and arrays name their item type.
 
+namespace mu::engraving {
+class MasterScore;
+}
+
 namespace mu::agent {
 class AgentEnv;
 
@@ -62,11 +66,24 @@ struct Result {
 };
 
 enum class CommandKind {
-    Read,   // never mutates the score
-    Write,  // runs inside one transaction (P2.1)
+    Read,    // never mutates the score or the app
+    Write,   // mutates the score inside one transaction the registry opens (P2.1)
+    Control, // mutates, but manages the undo stack itself or acts on the app: batch, undo, redo, test_dispatch
 };
 
 using Handler = std::function<Result (const Params& params, AgentEnv& env)>;
+
+//! What a write operation gets. It runs inside a transaction the runner opened (one per request,
+//! or one per batch): it edits `score` through engraving-level calls, checks its own
+//! post-conditions, puts its results in `out`, and returns an error to roll everything back.
+//! It never opens, locks, commits or rolls back anything itself (CLAUDE.md rules 3 and 4).
+struct WriteContext {
+    mu::engraving::MasterScore* score = nullptr;
+    AgentEnv& env;
+    std::map<std::string, muse::Val>& out;
+};
+
+using WriteHandler = std::function<muse::Ret (const Params& params, WriteContext& ctx)>;
 
 struct CommandInfo {
     std::string uri;          // command://<area>/<name>, as in MuseScore 5
@@ -76,6 +93,8 @@ struct CommandInfo {
     std::map<std::string, Arg> input;
     std::map<std::string, Arg> output;
     CommandKind kind = CommandKind::Read;
-    Handler handler;
+    Handler handler;           // Read and Control commands
+    WriteHandler write;        // Write commands: run inside a transaction by the registry
+    std::string undoName;      // Write commands: the undo entry's name, e.g. "Add dynamic"
 };
 }

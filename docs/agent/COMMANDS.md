@@ -4,14 +4,16 @@ This is the specification the registry is built from. Every command has a row he
 a section in its group's spec sheet (`specs/<group>.md`, written by `api-scout`),
 and at least one scenario. URIs follow MuseScore 5's `command://<area>/<name>` shape.
 
+How to write a command against the core: `CORE.md`.
+
 Status values: `—` not started · `spec` spec sheet done · `impl` implemented ·
 `review` in review · `merged` merged and gate-tested.
 
 | Group | Commands | Phase | Owner | Spec | Impl |
 |---|---|---|---|---|---|
-| `session` | hello, instances_list, scores_list, score_open, undo, redo, save, backup_snapshot | 1–3 | Conductor | spec | — |
-| `read` | score_overview, score_read, score_export, score_render, score_changes, score_validate | 1 | Conductor | spec | — |
-| `notes` | write_voice, add_note_to_chord, remove_note, set_duration, tie, tuplet, grace, clear_range, exchange_voices, batch | 2 | Conductor | spec | — |
+| `session` | hello, instances_list, scores_list, score_open, undo, redo, save, backup_snapshot | 1–3 | Conductor | spec | hello, undo, redo: impl (P1.2, P2.1) |
+| `read` | score_overview, score_read, score_export, score_render, score_changes, score_validate | 1 | Conductor | spec | merged (G1) |
+| `notes` | write_voice, add_note_to_chord, remove_note, set_duration, tie, tuplet, grace, clear_range, exchange_voices, batch | 2 | Conductor | spec | batch: impl (P2.1) |
 | `pitch` | set_pitch, transpose | 2 | Wave A | spec | — |
 | `expression-marks` | add_dynamic, add_hairpin, add_articulation, add_ornament, add_fermata, add_breath | 2 | Wave A | spec | — |
 | `expression-lines` | add_slur, add_line (pedal, ottava, trill, volta, text line) | 2 | Wave A | spec | — |

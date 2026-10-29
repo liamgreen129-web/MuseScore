@@ -27,8 +27,13 @@
 #include "multiwindows/imultiwindowsprovider.h"
 #include "multiwindows/internal/multiprocess/imultiprocessprovider.h"
 #include "project/inotationwritersregister.h"
+#include "global/iinteractive.h"
+#include "actions/iactionsdispatcher.h"
+#include "playback/iplaybackcontroller.h"
 
 namespace mu::agent {
+class CommandRegistry;
+
 //! One committed change to the score, as published by the undo stack (ScoreChanges).
 //! Ticks, not pointers: nothing here outlives the request (CLAUDE.md rule 2).
 struct ChangeRecord {
@@ -68,6 +73,11 @@ public:
     muse::GlobalInject<muse::mi::IMultiWindowsProvider> multiwindowsProvider;
     muse::GlobalInject<muse::mi::IMultiProcessProvider> multiProcessProvider;
     muse::ContextInject<project::INotationWritersRegister> writers = { this };
+    muse::ContextInject<muse::IInteractive> interactive = { this };
+    muse::ContextInject<muse::actions::IActionsDispatcher> dispatcher = { this };
+    muse::ContextInject<playback::IPlaybackController> playback = { this };
+
+    const CommandRegistry* registry = nullptr; // for batch, which runs other commands
 
     int port = 0;
     long long pid = 0;

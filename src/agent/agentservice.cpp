@@ -62,6 +62,7 @@ bool AgentService::start()
     }
 
     registerAllCommands(m_registry);
+    m_env.registry = &m_registry;
 
     std::string version = std::string(MUSE_APP_VERSION) + "-agent";
 #ifdef MUSE_APP_REVISION

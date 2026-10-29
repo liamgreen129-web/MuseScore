@@ -36,6 +36,10 @@ enum class Err {
     StaleHandle,            // a handle no longer resolves to the element it named
     Exists,
     PostCondition,          // the edit ran but its effect could not be verified; rolled back
+    Refused,                // MuseScore itself refused the edit (MScore error); rolled back
+    Stale,                  // expectStateVersion / expectActionName did not match the score
+    NothingToUndo,          // undo with nothing to undo
+    NothingToRedo,          // redo with nothing to redo
     Internal,
 };
 
@@ -51,6 +55,10 @@ inline const char* errName(Err e)
     case Err::StaleHandle: return "E_STALE_HANDLE";
     case Err::Exists: return "E_EXISTS";
     case Err::PostCondition: return "E_POSTCONDITION";
+    case Err::Refused: return "E_REFUSED";
+    case Err::Stale: return "E_STALE";
+    case Err::NothingToUndo: return "E_NOTHING_TO_UNDO";
+    case Err::NothingToRedo: return "E_NOTHING_TO_REDO";
     case Err::Internal: return "E_INTERNAL";
     }
     return "E_INTERNAL";

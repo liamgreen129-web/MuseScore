@@ -18,6 +18,8 @@
  */
 #include "commandregistry.h"
 
+#include "writes/writerunner.h"
+
 #include <algorithm>
 #include <cmath>
 #include <exception>
@@ -99,7 +101,7 @@ bool CommandRegistry::add(const CommandInfo& info)
         LOGE() << "command name must be the last URI segment: " << info.uri << " / " << info.name;
         return false;
     }
-    if (!info.handler) {
+    if (info.kind == CommandKind::Write ? !info.write : !info.handler) {
         LOGE() << "command without handler: " << info.name;
         return false;
     }
@@ -114,8 +116,13 @@ bool CommandRegistry::add(const CommandInfo& info)
         }
     }
 
-    m_byName[info.name] = m_commands.size();
-    m_commands.push_back(info);
+    CommandInfo c = info;
+    if (c.kind == CommandKind::Write && !addWriteArgs(c)) {
+        LOGE() << "write command uses a reserved argument or output name: " << info.name;
+        return false;
+    }
+    m_byName[c.name] = m_commands.size();
+    m_commands.push_back(std::move(c));
     return true;
 }
 
@@ -222,6 +229,9 @@ Result CommandRegistry::call(const std::string& name, const Params& params, Agen
     }
 
     try {
+        if (info->kind == CommandKind::Write) {
+            return runWrite(*info, params, env);
+        }
         return info->handler(params, env);
     } catch (const std::exception& e) {
         LOGE() << "command " << name << " threw: " << e.what();
