@@ -1,0 +1,73 @@
+{
+  "id": "EL02",
+  "title": "add_slur in a score with linked parts: undo removes it everywhere, redo puts it back",
+  "source": "specs/expression-lines.md add_slur, EL-01, EL-09",
+  "fixture": "synthetic/parts-linked.mscz",
+  "specs": [
+    "specs/expression-lines.md add_slur"
+  ],
+  "steps": [
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {"notContains": "type=\"Slur\""},
+      "note": "the clarinet part has no slur yet"
+    },
+    {
+      "tool": "add_slur",
+      "writes": true,
+      "args": {
+        "start": {"measure": 2, "beat": 1, "staff": {"part": "Clarinet in B♭"}, "voice": 1},
+        "end": {"measure": 2, "beat": 4, "staff": {"part": "Clarinet in B♭"}, "voice": 1}
+      },
+      "expect": {"bars": {"contains": "m2 v1 | (A5:h G5:q E5:q)"}}
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {"contains": "type=\"Slur\""}
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/2_Flute_and_Clarinet/.*\\.mscx$",
+      "text": {"regex": "(?s)type=\"Slur\".*type=\"Slur\""},
+      "note": "the flute's own slur plus the new clarinet slur"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {"notContains": "type=\"Slur\""}
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {"contains": "type=\"Slur\""}
+    },
+    {
+      "tool": "score_read",
+      "args": {"from": 2, "to": 2, "staves": [2]},
+      "expect": {"text": {"contains": "m2 v1 | (A5:h G5:q E5:q)"}}
+    }
+  ],
+  "goldens": [
+    {"format": "musicxml", "path": "goldens/EL02_slur_linked_parts_undo_redo.musicxml"}
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

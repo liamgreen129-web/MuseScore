@@ -1,0 +1,238 @@
+{
+  "id": "EL03",
+  "title": "add_line: ottava, trill, pedal and text line on one staff; refusals leave the score unchanged",
+  "source": "specs/expression-lines.md add_line, EL-20, EL-30, EL-40, EL-60",
+  "fixture": "synthetic/pickup-bar.mscz",
+  "specs": [
+    "specs/expression-lines.md add_line"
+  ],
+  "steps": [
+    {
+      "tool": "add_line",
+      "writes": true,
+      "args": {
+        "kind": "ottava",
+        "start": {
+          "measure": 2,
+          "beat": 1,
+          "staff": 1
+        },
+        "end": {
+          "measure": 3,
+          "beat": 3,
+          "staff": 1
+        }
+      },
+      "expect": {
+        "kind": "ottava",
+        "startBar": 2,
+        "endBar": 3,
+        "handle": {
+          "startswith": "Ottava:"
+        },
+        "bars": {
+          "all": [
+            {
+              "contains": "+8va["
+            },
+            {
+              "contains": "+8va]"
+            }
+          ]
+        }
+      },
+      "note": "an 8va over two bars: the notes under it sound an octave higher"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 4,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | E5:h+8va[ D5:q"
+            },
+            {
+              "contains": "m3(2) v1 | G5:h F5:q+8va]"
+            },
+            {
+              "contains": "m4(3) v1 | B4:h A4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_line",
+      "writes": true,
+      "args": {
+        "kind": "trill",
+        "start": {
+          "measure": 4,
+          "beat": 1,
+          "staff": 1
+        },
+        "end": {
+          "measure": 4,
+          "beat": 1,
+          "staff": 1
+        },
+        "trillType": "prallprall"
+      },
+      "expect": {
+        "bars": {
+          "all": [
+            {
+              "contains": "+trl["
+            },
+            {
+              "contains": "+trl]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_line",
+      "writes": true,
+      "args": {
+        "kind": "pedal",
+        "start": {
+          "measure": 5,
+          "beat": 1,
+          "staff": 1
+        },
+        "end": {
+          "measure": 5,
+          "beat": 3,
+          "staff": 1
+        },
+        "pedalStyle": "asterisk",
+        "placement": "below"
+      },
+      "expect": {
+        "bars": {
+          "contains": "m5(4) v1 | E4:h+ped[ D4:q"
+        }
+      },
+      "note": "the end mark prints on the next event (m6): a read-printer issue reported with P2.4; tick2 is checked by the unit tests"
+    },
+    {
+      "tool": "add_line",
+      "writes": true,
+      "args": {
+        "kind": "textLine",
+        "start": {
+          "measure": 6,
+          "beat": 1,
+          "staff": 1
+        },
+        "end": {
+          "measure": 7,
+          "beat": 1,
+          "staff": 1
+        },
+        "text": "rit."
+      },
+      "expect": {
+        "bars": {
+          "contains": "m6(5) v1 | G4:h+txt[\"rit.\""
+        }
+      },
+      "note": "ends mid-score: a staff text line running to the last note is not printed by score_read (reported with P2.4)"
+    },
+    {
+      "tool": "add_line",
+      "args": {
+        "kind": "ottava",
+        "start": {
+          "measure": 3,
+          "beat": 1,
+          "staff": 1
+        },
+        "end": {
+          "measure": 2,
+          "beat": 1,
+          "staff": 1
+        }
+      },
+      "error": "E_RANGE",
+      "note": "end before start"
+    },
+    {
+      "tool": "add_line",
+      "args": {
+        "kind": "pedal",
+        "start": {
+          "measure": 2,
+          "beat": 1,
+          "staff": 1
+        },
+        "end": {
+          "measure": 2,
+          "beat": 3,
+          "staff": 1
+        },
+        "ottavaType": "8vb"
+      },
+      "error": "E_INVALID_ARG",
+      "text": {
+        "contains": "does not apply"
+      }
+    },
+    {
+      "tool": "add_line",
+      "args": {
+        "kind": "volta",
+        "start": {
+          "measure": 2,
+          "beat": 2,
+          "staff": 1
+        },
+        "end": {
+          "measure": 3
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "text": {
+        "contains": "whole bars"
+      }
+    },
+    {
+      "tool": "add_line",
+      "args": {
+        "kind": "trill",
+        "start": {
+          "measure": 2,
+          "beat": 2,
+          "staff": 1
+        },
+        "end": {
+          "measure": 3,
+          "beat": 1,
+          "staff": 1
+        }
+      },
+      "error": "E_RANGE",
+      "text": {
+        "contains": "no chord or rest starts at m2 beat 2"
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EL03_line_kinds.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

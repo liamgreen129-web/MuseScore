@@ -1,0 +1,103 @@
+{
+  "id": "EL01",
+  "title": "add_slur: cross-staff and cross-voice slurs; refusals leave the score unchanged",
+  "source": "specs/expression-lines.md add_slur, EL-04, EL-05, EL-07, EL-08",
+  "fixture": "synthetic/spanners-system-break.mscz",
+  "specs": [
+    "specs/expression-lines.md add_slur"
+  ],
+  "steps": [
+    {
+      "tool": "add_slur",
+      "writes": true,
+      "args": {
+        "start": {"measure": 5, "beat": 4, "staff": {"part": "Piano", "index": 1}, "voice": 1},
+        "end": {"measure": 6, "beat": 1, "staff": {"part": "Piano", "index": 2}, "voice": 1}
+      },
+      "expect": {
+        "startBar": 5,
+        "endBar": 6,
+        "handle": {"startswith": "Slur:"},
+        "bars": {"all": [{"contains": "# s1"}, {"contains": "# s2"}, {"regex": "m5 v1 \\| .*\\(G4:q"}]}
+      },
+      "note": "RH last beat of m5 to LH first beat of m6, one part"
+    },
+    {
+      "tool": "add_slur",
+      "writes": true,
+      "args": {
+        "start": {"measure": 12, "beat": 1, "staff": 2},
+        "end": {"measure": 12, "beat": 3, "staff": 2},
+        "direction": "down",
+        "style": "dashed"
+      },
+      "expect": {"bars": {"contains": "m12 v1 | (C3:h E3:h)"}},
+      "note": "staff given as score_read's staff number; voice defaults to 1"
+    },
+    {
+      "tool": "add_slur",
+      "args": {
+        "start": {"measure": 12, "beat": 1, "staff": 2},
+        "end": {"measure": 12, "beat": 3, "staff": 2}
+      },
+      "error": "E_EXISTS",
+      "note": "the same slur again (with direction auto it would add nothing in the UI)"
+    },
+    {
+      "tool": "add_slur",
+      "args": {
+        "start": {"measure": 3, "beat": 2, "staff": 2, "voice": 1},
+        "end": {"measure": 4, "beat": 1, "staff": 2, "voice": 1}
+      },
+      "error": "E_RANGE",
+      "text": {"contains": "beats 1, 3"},
+      "note": "the LH has half notes: nothing starts on beat 2"
+    },
+    {
+      "tool": "add_slur",
+      "args": {
+        "start": {"measure": 3, "beat": 1, "staff": 2},
+        "end": {"measure": 3, "beat": 1, "staff": 2}
+      },
+      "error": "E_INVALID_ARG",
+      "note": "both ends on one chord"
+    },
+    {
+      "tool": "add_slur",
+      "args": {
+        "start": {"measure": 3, "beat": 1, "staff": {"part": "Violin"}},
+        "end": {"measure": 3, "beat": 3, "staff": 2}
+      },
+      "error": "E_RANGE",
+      "text": {"contains": "no part named"}
+    },
+    {
+      "tool": "add_slur",
+      "args": {
+        "start": {"measure": 3, "beat": 1, "staff": 2, "handle": "Chord:x@m1.s1.v1"},
+        "end": {"measure": 3, "beat": 3, "staff": 2}
+      },
+      "error": "E_INVALID_ARG"
+    },
+    {
+      "tool": "add_slur",
+      "args": {
+        "start": {"measure": 40, "beat": 1, "staff": 2},
+        "end": {"measure": 3, "beat": 3, "staff": 2}
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "score_read",
+      "args": {"from": 12, "to": 12, "staves": [2]},
+      "expect": {"text": {"contains": "m12 v1 | (C3:h E3:h)"}}
+    }
+  ],
+  "goldens": [
+    {"format": "musicxml", "path": "goldens/EL01_slur_cross_staff_and_errors.musicxml"}
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

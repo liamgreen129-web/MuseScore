@@ -98,7 +98,7 @@
           "voice": 1
         }
       },
-      "error": "E_",
+      "error": "E_RANGE",
       "note": "end before start"
     }
   ],
@@ -114,6 +114,6 @@
   },
   "questions": [
     "add_slur eventAddress staff.index: 1-based here, but write_voice's StaffRef uses staffIndex 0-based; the two shapes need unifying.",
-    "Error code for end-before-start slur not specified in expression-lines.md; the step only checks the E_ prefix."
+    "End before start is E_RANGE (expression-lines implementation, P2.4)."
   ]
 }

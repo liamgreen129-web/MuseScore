@@ -88,6 +88,9 @@ target_sources(agent PRIVATE
     commands/app/appcommands.h
     commands/notes/notescommands.cpp
     commands/notes/notescommands.h
+    commands/expression-lines/expressionlines.h
+    commands/expression-lines/lineops.cpp
+    commands/expression-lines/register.cpp
     commands/read/readcommands.cpp
     commands/read/exportcommands.cpp
     commands/read/readcommands.h

@@ -1,0 +1,178 @@
+{
+  "id": "EL04",
+  "title": "add_line in a score with linked parts: volta, system text line and trill reach the parts; each undo and redo round-trips",
+  "source": "specs/expression-lines.md add_line, EL-41, EL-51, EL-53, EL-54, EL-61",
+  "fixture": "synthetic/parts-linked.mscz",
+  "specs": [
+    "specs/expression-lines.md add_line"
+  ],
+  "steps": [
+    {
+      "tool": "add_line",
+      "writes": true,
+      "args": {
+        "kind": "volta",
+        "start": {
+          "measure": 3
+        },
+        "end": {
+          "measure": 3
+        },
+        "endings": [
+          1
+        ]
+      },
+      "expect": {
+        "handle": {
+          "startswith": "Volta:"
+        },
+        "bars": {
+          "all": [
+            {
+              "contains": "volta=1"
+            },
+            {
+              "contains": "volta=end"
+            }
+          ]
+        }
+      },
+      "note": "a bracket only: no repeat barline is added (as in the UI)"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/.*\\.mscx$",
+      "text": {
+        "contains": "<Volta>"
+      },
+      "note": "every part shows the volta"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "add_line",
+      "writes": true,
+      "args": {
+        "kind": "textLine",
+        "start": {
+          "measure": 1,
+          "beat": 1,
+          "staff": 3
+        },
+        "end": {
+          "measure": 2,
+          "beat": 3,
+          "staff": 3
+        },
+        "text": "accel.",
+        "system": true
+      },
+      "note": "a system text line goes on the top staff and into every part, whatever staff the address names (score_read does not print it yet, reported with P2.4: checked in the export)"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/.*\\.mscx$",
+      "text": {
+        "contains": "accel."
+      }
+    },
+    {
+      "tool": "add_line",
+      "writes": true,
+      "args": {
+        "kind": "trill",
+        "start": {
+          "measure": 4,
+          "beat": 1,
+          "staff": {
+            "part": "Flute"
+          }
+        },
+        "end": {
+          "measure": 4,
+          "beat": 1,
+          "staff": {
+            "part": "Flute"
+          }
+        }
+      },
+      "expect": {
+        "bars": {
+          "contains": "+trl["
+        }
+      },
+      "note": "a trill in a score with parts: every linked copy needs its ornament (spec crash risk)"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/(0_Flute|2_Flute_and_Clarinet)/.*\\.mscx$",
+      "text": {
+        "contains": "<Trill>"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "notContains": "<Trill>"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "notContains": "<Trill>"
+      }
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 4,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "volta=1"
+            },
+            {
+              "contains": "+trl["
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/EL04_lines_linked_parts_undo_redo.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}
