@@ -100,3 +100,16 @@
 - 2026-10-29 · Upstream footprint: three tagged lines (src/CMakeLists.txt, src/app/CMakeLists.txt, src/app/appfactory.cpp include + addModule). GUI app only; console/converter runs don't start the server.
 - 2026-10-29 · **Qt `offscreen` and `minimal` platforms crash MuseScore 4.7.6 during GUI setup (SIGSEGV after "New context created"), with or without the agent module, with Metal, OpenGL or software Quick backends.** Tests therefore launch the normal GUI in the background (`open -n -g`). P2.2's scenario driver must solve headless running or accept background windows.
 - 2026-10-29 · `tests/agent/test_server.py`: 29 checks, all PASS on build 6d6e0c7+P1.1.
+
+## P1.2 / fixtures (2026-10-29)
+
+- 2026-10-29 · MCP tool names are the bare command name (`hello`, `score_read`), unique across groups; internal ids stay MuseScore 5 URIs (`command://app/hello`) · upstream's `app.hello` mapping uses dots, which Anthropic's API rejects in tool names (`^[a-zA-Z0-9_-]{1,64}$`).
+- 2026-10-29 · Fixtures and NOTATION.md examples come from public-domain scores in the music21 corpus (Bach chorales, classical, folk) plus Claude-composed examples for edge cases · Liam: "surely you can use your own scores… make ur own or find some". P1.6 no longer waits on Liam; his own transcriptions are optional extras.
+- 2026-10-29 · P1.2 registry: `src/agent/registry/` (CommandInfo shaped like rcommand: URI, name, title, description, typed args with required/min/max/enum/items, Read/Write kind, handler). Arguments are validated before any handler runs: unknown, missing, wrong type, non-whole integers, range, enum, array item type → `E_INVALID_ARG`. Handler exceptions → `E_INTERNAL`.
+- 2026-10-29 · Error text is `E_CODE: message` (Ret code 9000+). The server sends `Ret::text()`, not upstream's `[code] message`, so clients can match on the prefix. Shared codes live in `registry/errors.h`; group codes are added there at merge.
+- 2026-10-29 · Command groups register through `src/agent/commands/allcommands.cpp`, the one list only the conductor edits.
+- 2026-10-29 · Discovery records: `<userAppData>/agent/instances/<pid>.json` (0600, folder 0700): pid, port, url, version, startedAt, instanceId, score {path, displayName}; rewritten when the current project, its path or its name changes; removed on graceful quit; records of dead pids are ignored by readers and pruned at every start (SIGTERM/crash skip shutdown). Never contains the token.
+- 2026-10-29 · The server starts in `onAllInited` (all services registered) rather than `onInit`.
+- 2026-10-29 · Agent module builds with `NO_UNITY`: unity merging put `mcp::DataType` and `agent::DataType` in one translation unit.
+- 2026-10-29 · Preferences page deferred from P1.2 to P4.1 (the Agent preferences section) · the env kill switch covers P1; a QML page now would be rebuilt in P4 anyway.
+- 2026-10-29 · `tests/agent/test_hello.py`: 31 checks PASS; `test_server.py` still 29/29.

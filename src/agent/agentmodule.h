@@ -24,9 +24,7 @@
 #include "modularity/imodulesetup.h"
 
 namespace mu::agent {
-namespace mcp {
-class McpServer;
-}
+class AgentService;
 
 class AgentModule : public muse::modularity::IModuleSetup
 {
@@ -42,10 +40,10 @@ public:
     AgentContext(const muse::modularity::ContextPtr& ctx);
     ~AgentContext() override;
 
-    void onInit(const muse::IApplication::RunMode& mode) override;
+    void onAllInited(const muse::IApplication::RunMode& mode) override;
     void onDeinit() override;
 
 private:
-    std::unique_ptr<mcp::McpServer> m_server;
+    std::unique_ptr<AgentService> m_service;
 };
 }

@@ -356,7 +356,8 @@ void McpServer::onToolsCall(const JsonObject& request, const std::function<void(
             isError = true;
             JsonObject errText;
             errText["type"] = "text";
-            errText["text"] = toolResult.ret.toString();
+            // AGENT: the message alone ("E_CODE: ..."), not upstream's "[code] message"
+            errText["text"] = toolResult.ret.text().empty() ? toolResult.ret.toString() : toolResult.ret.text();
             content.append(errText);
         }
 

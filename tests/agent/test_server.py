@@ -79,12 +79,12 @@ class App:
     Qt's offscreen/minimal platforms crash MuseScore 4.7.6 during GUI setup (with or without
     the agent module), so tests run the normal GUI without bringing it to the front."""
 
-    def __init__(self, bundle, env=None):
+    def __init__(self, bundle, env=None, args=None):
         before = agent_pids()
-        args = ["open", "-n", "-g"]
+        args_ = ["open", "-n", "-g"]
         for k, v in (env or {}).items():
-            args += ["--env", f"{k}={v}"]
-        subprocess.run(args + ["-a", str(bundle)], check=True)
+            args_ += ["--env", f"{k}={v}"]
+        subprocess.run(args_ + ["-a", str(bundle)] + list(args or []), check=True)
         self.pid = None
         deadline = time.time() + 30
         while time.time() < deadline and self.pid is None:

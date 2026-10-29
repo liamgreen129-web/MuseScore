@@ -20,13 +20,7 @@
 
 #include <cstdlib>
 
-#include "muse_framework_config.h"
-#include "global/iglobalconfiguration.h"
-#include "modularity/ioc.h"
-
-#include "server/httptransport.h"
-#include "server/mcpserver.h"
-#include "server/tokenstore.h"
+#include "agentservice.h"
 
 #include "log.h"
 
@@ -56,7 +50,7 @@ AgentContext::AgentContext(const modularity::ContextPtr& ctx)
 
 AgentContext::~AgentContext() = default;
 
-void AgentContext::onInit(const IApplication::RunMode& mode)
+void AgentContext::onAllInited(const IApplication::RunMode& mode)
 {
     if (mode != IApplication::RunMode::GuiApp) {
         return;
@@ -67,41 +61,16 @@ void AgentContext::onInit(const IApplication::RunMode& mode)
         return;
     }
 
-    GlobalInject<IGlobalConfiguration> globalConfiguration;
-    const QString agentDir = globalConfiguration()->userAppDataPath().toQString() + "/agent";
-
-    mcp::HttpTransportConfig config;
-    config.token = TokenStore::loadOrCreate(agentDir);
-    if (config.token.isEmpty()) {
-        LOGE() << "agent server not started: no token";
-        return;
+    m_service = std::make_unique<AgentService>(iocContext());
+    if (!m_service->start()) {
+        m_service.reset();
     }
-
-    std::string version = std::string(MUSE_APP_VERSION) + "-agent";
-#ifdef MUSE_APP_REVISION
-    version += "+" + std::string(MUSE_APP_REVISION);
-#endif
-
-    m_server = std::make_unique<mcp::McpServer>(version, std::make_unique<mcp::HttpTransport>(config));
-
-    // P1.1: no tools yet; the registry (P1.2) replaces these handlers.
-    m_server->onToolsListRequest([](const mcp::McpServer::ToolsListResultHandler& onResult) {
-        onResult({});
-    });
-    m_server->onToolsCallRequest([](const std::string& name, const std::map<std::string, Val>&,
-                                    const mcp::McpServer::ToolsCallResultHandler& onResult) {
-        mcp::ToolResult result;
-        result.ret = make_ret(Ret::Code::NotSupported, "unknown tool: " + name);
-        onResult(result);
-    });
-
-    m_server->init();
 }
 
 void AgentContext::onDeinit()
 {
-    if (m_server) {
-        m_server->deinit();
-        m_server.reset();
+    if (m_service) {
+        m_service->stop();
+        m_service.reset();
     }
 }
