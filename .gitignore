@@ -83,3 +83,6 @@ __pycache__/
 /mscore/revision.h
 /share/sound/MuseScore_General*
 /VERSION
+.claude/settings.local.json
+tests/fixtures/real/
+build.log
