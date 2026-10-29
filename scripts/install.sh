@@ -27,7 +27,10 @@ rm -rf "$DEST"
 ditto "$SRC" "$DEST"
 codesign --force --deep --sign - "$DEST"
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$DEST"
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$LSREGISTER" -f "$DEST"
+# keep the build-tree copy out of Finder's "Open With"
+"$LSREGISTER" -u "$SRC" 2>/dev/null || true
 
 "$ROOT/scripts/check-identity.sh" "$DEST"
 echo "installed: $DEST"
