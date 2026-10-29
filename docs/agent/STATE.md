@@ -4,17 +4,17 @@ Updated by the conductor at the end of every session and before every STOP.
 
 - **Machine:** MacBook Pro (M1 Pro, 16 GB) for now; Mac mini later (DECISIONS 2026-10-29)
 - **Phase:** 2
-- **Current task:** P2.3 write_voice (conductor), design done, no code yet (see notes below). P2.1 done: tag `core-v1` (e57ee76e91) pushed. P2.2 delivered on branch `worktree-agent-aea2c55d063305eea` @ 77d7b23bb4, in review.
-- **Last finished (2026-10-29):** P1.1 server, P1.2 registry/hello/discovery, P1.3 NOTATION.md (approved), P1.4 parser/writer/validator/score printer, P1.5 synthetic fixtures (21, merged by path), P1.6 corpus fixtures (18, regenerate with tools/fixtures/make_corpus_fixtures.py), P1.7 read commands (score_overview, score_read, score_validate, score_changes, score_export, score_render), P1.8 G1 run (signed off by Liam 2026-10-29), P2.1 core (see CORE.md)
-- **Test status at last commit:** scripts/test.sh 50/50 (22 core/handles + 28 notation/printer); tests/agent/test_server.py 29/29, test_hello.py 32/32, test_read.py 39/39, test_core.py 53/53, test_export.py 160/160 (full run at G1; spot-checked after core)
+- **Current task:** P2.3 write_voice (conductor), design below. P2.4 Wave A running: expression-marks and expression-lines implementers in their own worktrees. P2.2 merged (c0416deaf9) after review fixes. P2.1 done: tag `core-v1` (e57ee76e91).
+- **Last finished (2026-10-29):** P1.1–P1.8 (G1 signed off by Liam 2026-10-29), P2.1 core (see CORE.md), P2.2 scenario driver + soak (tests/agent/harness, tests/agent/scenarios)
+- **Test status at last commit:** scripts/test.sh 50/50 (22 core/handles + 28 notation/printer); tests/agent/test_server.py 29/29, test_hello.py 32/32, test_read.py 39/39, test_core.py 53/53, test_export.py 160/160 (full run at G1; spot-checked after P2.2); scenarios/run.py 3 ok, 20 SKIP (tools not yet built), run PASS
 - **Next:**
-  1. P2.2 merge: a `reviewer` subagent was reviewing the branch when the session paused (its result may be lost; if so, spawn a new reviewer on `git diff a049c90814 77d7b23bb4`). Then rebase onto agent/4.7, run all tests + `python3 -I tests/agent/scenarios/run.py` here, merge, update COMMANDS/STATE. Implementer's notes: goldens blank `<programRevision>`; S01–S20 SKIP until tools exist, then `--update-goldens` and review; S17's note that writes lack expectStateVersion is now obsolete (core adds it); batch validation errors say "operation N:", runtime errors "step N (cmd):"; parts-linked.mscz opens with needSave=true; system python3 is 3.9.
-  2. P2.3 write_voice (design below), then the rest of the notes group.
-  3. P2.4 Wave A (max 2 implementers), after P2.2 is merged; point them at CORE.md.
+  1. P2.3 write_voice (design below), then the rest of the notes group.
+  2. Merge Wave A branches per protocol as they report (reviewer first; rebuild here; rerun everything); then start `text` and `pitch` implementers.
+  3. Before G2: add a `test_modal` action (open/close a modal) to test_dispatch so S18 runs; `--update-goldens` for S01–S20 as their tools land, reviewing each golden.
 - **Blockers / waiting on Liam:**
   1. Update the daily app 4.7.4 → 4.7.6.
-- **Background jobs:** reviewer on the P2.2 branch (may not survive the pause)
-- **Worktrees in use:** .claude/worktrees/agent-aea2c55d063305eea (P2.2, branch worktree-agent-aea2c55d063305eea); remove after merge
+- **Background jobs:** command-implementer for expression-marks; command-implementer for expression-lines (see DECISIONS for branch names when they report)
+- **Worktrees in use:** the two Wave A implementers' (under .claude/worktrees/)
 - **Notes for the next session:**
   - **write_voice design (P2.3, decided, not yet coded)** — file `src/agent/commands/notes/` (own register.cpp; conductor adds to allcommands):
     - Args: `staff` (int, 1-based like score_read), `content` = notation voice lines `m<N> v<V> | ...` exactly as score_read prints (headers/comments ignored; bar attrs, harmony lines, `+marks` and slurs refused in v1 with a message naming the commands that add them), `pitch` sounding|written (default sounding), `keepAnnotations` (default true). Each (bar, voice) line replaces that voice in that bar.

@@ -15,8 +15,8 @@ Status values: `—` not started · `spec` spec sheet done · `impl` implemented
 | `read` | score_overview, score_read, score_export, score_render, score_changes, score_validate | 1 | Conductor | spec | merged (G1) |
 | `notes` | write_voice, add_note_to_chord, remove_note, set_duration, tie, tuplet, grace, clear_range, exchange_voices, batch | 2 | Conductor | spec | batch: impl (P2.1) |
 | `pitch` | set_pitch, transpose | 2 | Wave A | spec | — |
-| `expression-marks` | add_dynamic, add_hairpin, add_articulation, add_ornament, add_fermata, add_breath | 2 | Wave A | spec | — |
-| `expression-lines` | add_slur, add_line (pedal, ottava, trill, volta, text line) | 2 | Wave A | spec | — |
+| `expression-marks` | add_dynamic, add_hairpin, add_articulation, add_ornament, add_fermata, add_breath | 2 | Wave A | spec, impl in progress | — |
+| `expression-lines` | add_slur, add_line (pedal, ottava, trill, volta, text line) | 2 | Wave A | spec, impl in progress | — |
 | `text` | add_text (staff, system, expression, tempo, rehearsal), add_chord_symbol, add_lyric | 2 | Wave A | spec | — |
 | `structure` | insert_measures, remove_measures, split_measure, join_measures, set_time_signature, set_key_signature, set_tempo, set_barline, set_repeat, add_break, add_clef | 3 | Wave B | spec | — |
 | `instrumentation` | add_part, remove_part, rename_part, set_instrument, add_staff, set_staff_type, set_transposition | 3 | Wave B | spec | — |
