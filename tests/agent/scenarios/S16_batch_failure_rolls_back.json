@@ -1,0 +1,334 @@
+{
+  "id": "S16",
+  "title": "A batch with a deliberate failure in step 7 leaves the score unchanged",
+  "source": "assessment.md Phase 2, S16",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/notes.md batch"
+  ],
+  "steps": [
+    {
+      "tool": "batch",
+      "args": {
+        "name": "Dynamics and phrasing",
+        "operations": [
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Soprano",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Alto",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Tenor",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Bass",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_hairpin",
+            "args": {
+              "kind": "cresc",
+              "staff": {
+                "part": "Soprano",
+                "index": 1
+              },
+              "from": {
+                "measure": 2,
+                "beat": 1
+              },
+              "to": {
+                "measure": 2,
+                "beat": 4
+              }
+            }
+          },
+          {
+            "command": "add_slur",
+            "args": {
+              "start": {
+                "measure": 3,
+                "beat": 1,
+                "staff": {
+                  "part": "Alto",
+                  "index": 1
+                },
+                "voice": 1
+              },
+              "end": {
+                "measure": 3,
+                "beat": 2,
+                "staff": {
+                  "part": "Alto",
+                  "index": 1
+                },
+                "voice": 1
+              }
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Soprano",
+                "index": 1
+              },
+              "at": {
+                "measure": 99,
+                "beat": 1
+              },
+              "dynamic": "f"
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Bass",
+                "index": 1
+              },
+              "at": {
+                "measure": 3,
+                "beat": 1
+              },
+              "dynamic": "f"
+            }
+          }
+        ]
+      },
+      "error": "E_RANGE",
+      "text": {
+        "regex": "(step|operation|op)\\W*7"
+      },
+      "note": "op 7 addresses bar 99"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 0
+    },
+    {
+      "tool": "score_changes",
+      "args": {
+        "since": 0
+      },
+      "expect": {
+        "stateVersion": 0,
+        "bars": ""
+      }
+    },
+    {
+      "tool": "batch",
+      "writes": true,
+      "args": {
+        "name": "Dynamics and phrasing",
+        "operations": [
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Soprano",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Alto",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Tenor",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Bass",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "dynamic": "p"
+            }
+          },
+          {
+            "command": "add_hairpin",
+            "args": {
+              "kind": "cresc",
+              "staff": {
+                "part": "Soprano",
+                "index": 1
+              },
+              "from": {
+                "measure": 2,
+                "beat": 1
+              },
+              "to": {
+                "measure": 2,
+                "beat": 4
+              }
+            }
+          },
+          {
+            "command": "add_slur",
+            "args": {
+              "start": {
+                "measure": 3,
+                "beat": 1,
+                "staff": {
+                  "part": "Alto",
+                  "index": 1
+                },
+                "voice": 1
+              },
+              "end": {
+                "measure": 3,
+                "beat": 2,
+                "staff": {
+                  "part": "Alto",
+                  "index": 1
+                },
+                "voice": 1
+              }
+            }
+          },
+          {
+            "command": "add_dynamic",
+            "args": {
+              "staff": {
+                "part": "Bass",
+                "index": 1
+              },
+              "at": {
+                "measure": 3,
+                "beat": 1
+              },
+              "dynamic": "f"
+            }
+          }
+        ]
+      },
+      "note": "the same batch without the bad op: one undo entry"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 1
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 3,
+        "staves": [
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | A4:q+p+<"
+            },
+            {
+              "contains": "m3(2) v1 | (E4:e A4:e G#4:q)"
+            },
+            {
+              "contains": "m3(2) v1 | A3:e+f"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S16_batch_failure_rolls_back.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "batch arguments are shape-only in notes.md ({name, operations:[{command,args}]}); whether the error is the failing op's code (E_RANGE) or a wrapper code (E_BATCH) with the op's code inside is undecided.",
+    "How the failing op is named in the error text (index, 1-based?) is undecided; the step accepts 'step 7', 'operation 7' or 'op 7'.",
+    "Hairpin end mark: m2 beat 4 is the last note under the hairpin; the read check covers only the start (`+p+<`, marks in NOTATION.md 5 order: dynamic before hairpin)."
+  ]
+}

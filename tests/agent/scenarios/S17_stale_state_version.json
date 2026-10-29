@@ -1,0 +1,103 @@
+{
+  "id": "S17",
+  "title": "A concurrent edit between read and write is detected by stateVersion",
+  "source": "assessment.md Phase 2, S17",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/read.md score_changes",
+    "specs/session.md undo (E_STALE)"
+  ],
+  "manual": "A real user edit needs the GUI (or a future test hook that runs an edit through the UI's action path, e.g. `_test_user_edit`). Scriptable stand-in: a second agent write plays the user. The detection logic under test (stateVersion compare, E_STALE) is the same.",
+  "steps": [
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "capture": {
+        "v": "stateVersion"
+      }
+    },
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "f"
+      },
+      "note": "stand-in for the user's edit"
+    },
+    {
+      "tool": "score_changes",
+      "args": {
+        "since": "${v}"
+      },
+      "expect": {
+        "stateVersion": {
+          "gt": 0
+        },
+        "bars": {
+          "contains": "2"
+        }
+      }
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 2,
+        "content": "A4:h B4:h",
+        "expectStateVersion": "${v}"
+      },
+      "error": "E_STALE"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | A4:q B4:q C#5:q+ferm E5:q"
+            }
+          ]
+        }
+      },
+      "note": "refused write changed nothing"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S17_stale_state_version.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "No write command's schema has expectStateVersion (only undo/redo in session.md). S17 assumes every write takes an optional expectStateVersion and refuses with E_STALE; this is a core (P2.1) decision."
+  ]
+}

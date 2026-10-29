@@ -1,0 +1,86 @@
+{
+  "id": "S18",
+  "title": "An edit while a modal dialog is open is refused",
+  "source": "assessment.md Phase 2, S18",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "assessment.md risks (E_BUSY / modal)",
+    "specs/session.md"
+  ],
+  "manual": "Needs a test hook that opens and closes a modal dialog in the instance (proposed tool `_test_modal` with {action: open|close}, built only with a test flag). Manual alternative: open Preferences in the instance by hand and run the add_dynamic step.",
+  "needsHooks": [
+    "_test_modal"
+  ],
+  "steps": [
+    {
+      "tool": "_test_modal",
+      "args": {
+        "action": "open"
+      }
+    },
+    {
+      "tool": "add_dynamic",
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "p"
+      },
+      "error": "E_MODAL_OPEN"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "note": "reads still allowed (assumed)"
+    },
+    {
+      "tool": "_test_modal",
+      "args": {
+        "action": "close"
+      }
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "p"
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S18_modal_open_refused.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Error code: assessment says refusal while modal/progress dialogs are open and lists E_MODAL_OPEN in notes.md's reused codes; session.md uses E_BUSY for related cases. Which one?",
+    "Whether reads are also refused while a modal is open is not stated."
+  ]
+}

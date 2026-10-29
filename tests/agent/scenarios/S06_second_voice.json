@@ -1,0 +1,95 @@
+{
+  "id": "S06",
+  "title": "Add a second voice under an existing one",
+  "source": "assessment.md Phase 2, S6",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/notes.md write_voice"
+  ],
+  "steps": [
+    {
+      "tool": "write_voice",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 2,
+        "fromMeasure": 3,
+        "toMeasure": 4,
+        "content": "G4:h F4:h | _:h D4:h"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 4,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3 v1 | E5:q D5:q C5:q A4:q"
+            },
+            {
+              "contains": "m3 v2 | G4:h F4:h"
+            },
+            {
+              "contains": "m4 v1 | D5:q F5:q G5:q B4:q"
+            },
+            {
+              "contains": "m4 v2 | _:h D4:h"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 5,
+        "fromMeasure": 3,
+        "content": "G4:w"
+      },
+      "error": "E_RANGE",
+      "note": "voice 5"
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 2,
+        "fromMeasure": 3,
+        "content": "G4:h"
+      },
+      "error": "E_BAR_SUM",
+      "note": "voice 2 must fill with _"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S06_second_voice.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "How a gap at the start of voice 2 is printed after the write: assumed `_:h` (NOTATION.md 4); MuseScore stores no rest there, so the printer may print nothing for that time.",
+    "Voice out of 1-4: the input schema has min/max, so the server may reject it as E_INVALID_ARG (schema) rather than E_RANGE (notes.md)."
+  ]
+}

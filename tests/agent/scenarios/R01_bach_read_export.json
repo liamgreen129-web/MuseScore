@@ -1,0 +1,25 @@
+{
+  "id": "R01",
+  "title": "Bach chorale: overview, read, exports equal the goldens",
+  "source": "P2.2 read-only proof (test_read.py, NOTATION.md 9.1)",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "steps": [
+    {"tool": "score_overview",
+     "expect": {"parts": {"len": 4}, "parts.0.name": "Soprano", "parts.3.name": "Bass",
+                "score.bars": 10, "score.stateVersion": 0, "score.needSave": false}},
+    {"tool": "score_read", "args": {"from": 1, "to": 4, "staves": [1]},
+     "expect": {"from": 1, "to": 4,
+                "text": {"startswith": "# s1 \"Soprano\" clef=treble key=f# time=C",
+                         "contains": "m2(1) v1 | A4:q B4:q C#5:q+ferm E5:q"}},
+     "capture": {"v": "stateVersion"}},
+    {"tool": "score_changes", "args": {"since": "${v}"}, "expect": {"stateVersion": 0, "bars": ""}},
+    {"tool": "score_render", "args": {"page": 1}, "expect": {"page": 1, "pages": {"gte": 1}}},
+    {"assert": "unchanged"},
+    {"assert": "undoIndex", "delta": 0}
+  ],
+  "goldens": [
+    {"format": "musicxml", "path": "goldens/R01_bach_bwv66_6.musicxml"},
+    {"format": "midi", "path": "goldens/R01_bach_bwv66_6.mid"}
+  ],
+  "invariants": {"validate": true, "undoRedo": false}
+}

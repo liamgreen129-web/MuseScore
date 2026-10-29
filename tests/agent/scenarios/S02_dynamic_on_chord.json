@@ -1,0 +1,137 @@
+{
+  "id": "S02",
+  "title": "Add a dynamic to an existing chord",
+  "source": "assessment.md Phase 2, S2",
+  "fixture": "synthetic/ties-barlines.mscz",
+  "specs": [
+    "specs/expression-marks.md add_dynamic"
+  ],
+  "steps": [
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2 v1 | E5:h [C5,E5,G5]:h~"
+            }
+          ]
+        }
+      },
+      "note": "before"
+    },
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Clarinet",
+          "index": 1
+        },
+        "voice": 1,
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "dynamic": "mf"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2 v1 | E5:h [C5,E5,G5]:h~+mf"
+            }
+          ]
+        }
+      },
+      "note": "one dynamic on the chord, tie kept"
+    },
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Clarinet",
+          "index": 1
+        },
+        "voice": 1,
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "dynamic": "f",
+        "if_exists": "replace"
+      },
+      "note": "replace, not a second dynamic"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "[C5,E5,G5]:h~+f"
+            },
+            {
+              "notContains": "+mf"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_dynamic",
+      "args": {
+        "staff": {
+          "part": "Clarinet",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "dynamic": "p",
+        "if_exists": "error"
+      },
+      "error": "E_EXISTS"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S02_dynamic_on_chord.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "add_dynamic if_exists default is 'replace' in the schema but depends on open question Q1/Q2; S02 passes it explicitly.",
+    "Mark order after a tie in a chord: assumed `]:h~+mf` (NOTATION.md 1 shows `F5:q~+<`)."
+  ]
+}

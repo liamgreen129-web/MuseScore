@@ -1,0 +1,71 @@
+{
+  "id": "S13",
+  "title": "Grace-note entry",
+  "source": "assessment.md Phase 2, S13",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/notes.md write_voice",
+    "specs/notes.md grace"
+  ],
+  "steps": [
+    {
+      "tool": "write_voice",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 3,
+        "content": "g/(F5:e) E5:q D5:q g(B4:s C5:s) D5:q C5:q ga(B4:s C5:s)"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 3,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3 v1 | g/(F5:e) E5:q D5:q g(B4:s C5:s) D5:q C5:q ga(B4:s C5:s)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 3,
+        "content": "g(D5:e) r:q D5:q C5:q A4:q"
+      },
+      "error": "E_GRACE",
+      "note": "grace note before a rest"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S13_grace_notes.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Grace notes after a note (`ga(...)`) mid-bar cannot come from MusicXML (fixtures README); the read form after a write is assumed to round-trip."
+  ]
+}

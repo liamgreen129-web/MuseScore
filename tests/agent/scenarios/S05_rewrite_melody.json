@@ -1,0 +1,138 @@
+{
+  "id": "S05",
+  "title": "Rewrite a 4-bar melody with write_voice",
+  "source": "assessment.md Phase 2, S5",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/notes.md write_voice",
+    "NOTATION.md 7"
+  ],
+  "steps": [
+    {
+      "tool": "write_voice",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 1,
+        "toMeasure": 4,
+        "content": "C5:q D5:q E5:q F5:q | G5:h E5:h | F5:q. E5:e D5:q C5:q | B4:h G4:h"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 4,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | C5:q D5:q E5:q F5:q"
+            },
+            {
+              "contains": "m2 v1 | G5:h E5:h"
+            },
+            {
+              "contains": "m3 v1 | F5:q. E5:e D5:q C5:q"
+            },
+            {
+              "contains": "m4 v1 | B4:h G4:h"
+            },
+            {
+              "contains": "m1 h | {C}:h {Am7}:h"
+            },
+            {
+              "contains": "m4 h | {Bbadd9}:h {Em7b5}:h"
+            }
+          ]
+        }
+      },
+      "note": "voice rewritten, chord symbols kept (NOTATION.md 7 rule 2)"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 5,
+        "to": 5,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m5 v1 | C#5:q E5:q F5:q A5:q"
+            }
+          ]
+        }
+      },
+      "note": "next bar untouched"
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 1,
+        "toMeasure": 1,
+        "content": "C5:q D5:q E5:q"
+      },
+      "error": "E_BAR_SUM"
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 1,
+        "toMeasure": 2,
+        "content": "C5:w"
+      },
+      "error": "E_RANGE",
+      "note": "bar count != range"
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Nobody",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 1,
+        "content": "C5:w"
+      },
+      "error": "E_"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S05_rewrite_melody.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "write_voice content: 'one segment per bar' (notes.md) does not say how bars are separated; assumed ' | ' between bar segments. Alternative: full voice lines 'm1 v1 | ...' separated by newlines (which would make fromMeasure redundant).",
+    "Unknown part name error code: not named in notes.md (E_RANGE? E_BAD_STAFF as in text.md 0.9?); the step only checks the E_ prefix.",
+    "Chord symbols are on an `h` line; whether write_voice with keepAnnotations=true keeps harmony anchored to removed segments is assumed (NOTATION.md 7 rule 2)."
+  ]
+}

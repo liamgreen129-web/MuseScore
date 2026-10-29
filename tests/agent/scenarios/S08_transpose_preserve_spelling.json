@@ -1,0 +1,140 @@
+{
+  "id": "S08",
+  "title": "Transpose a passage, spelling preserved",
+  "source": "assessment.md Phase 2, S8",
+  "fixture": "synthetic/transposing-instruments.mscz",
+  "specs": [
+    "specs/pitch.md transpose"
+  ],
+  "steps": [
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": {
+          "start": {
+            "measure": 3,
+            "beat": 1
+          },
+          "end": {
+            "measure": 3,
+            "beat": 4
+          },
+          "staves": [
+            {
+              "part": "Flute",
+              "index": 1
+            }
+          ]
+        },
+        "by": {
+          "interval": "M2",
+          "direction": "up"
+        },
+        "key_signatures": false
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 3,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3 v1 | C5:q G#4:q F4:q Bb4:q"
+            }
+          ]
+        }
+      },
+      "note": "Bb F# Eb Ab up a major second, diatonically spelled"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 3,
+        "staves": [
+          2
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3 v1 | Bb4:q F#4:q Eb4:q Ab4:q"
+            }
+          ]
+        }
+      },
+      "note": "trumpet untouched"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 1,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "key=C"
+            }
+          ]
+        }
+      },
+      "note": "no key change"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "start": {
+            "measure": 3,
+            "beat": 1
+          },
+          "end": {
+            "measure": 3,
+            "beat": 4
+          },
+          "staves": [
+            {
+              "part": "Flute",
+              "index": 1
+            }
+          ]
+        },
+        "by": {
+          "interval": "M9",
+          "direction": "up"
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "interval not in the enum (use octaves)"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S08_transpose_preserve_spelling.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "transpose range end: inclusive last note or exclusive position? Assumed {measure 3, beat 4} includes the note on beat 4.",
+    "transpose range staves items are untyped objects in pitch.md; assumed {part, index}.",
+    "An interval outside the enum may be refused by schema validation as E_INVALID_ARG or by the command as E_BAD_INTERVAL (pitch.md)."
+  ]
+}

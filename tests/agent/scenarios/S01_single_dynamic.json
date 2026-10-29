@@ -1,0 +1,135 @@
+{
+  "id": "S01",
+  "title": "Add one dynamic to a note",
+  "source": "assessment.md Phase 2, S1",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/expression-marks.md add_dynamic"
+  ],
+  "steps": [
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | A4:q B4:q C#5:q+ferm E5:q"
+            }
+          ]
+        }
+      },
+      "note": "before"
+    },
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "voice": 1,
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "p"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | A4:q+p B4:q C#5:q+ferm E5:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          2,
+          3,
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "notContains": "+p "
+            }
+          ]
+        }
+      },
+      "note": "other staves untouched"
+    },
+    {
+      "tool": "add_dynamic",
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 99,
+          "beat": 1
+        },
+        "dynamic": "p"
+      },
+      "error": "E_RANGE",
+      "note": "bar past the end"
+    },
+    {
+      "tool": "add_dynamic",
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1.5
+        },
+        "dynamic": "p"
+      },
+      "error": "E_NO_CHORDREST",
+      "note": "no note at beat 1.5"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S01_single_dynamic.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "expression-marks.md uses $ref #/defs/staffRef and #/defs/position but never defines them; assumed staff {part, index (1-based)} and at {measure, beat (1-based)} as in text.md 0.6/add_text.",
+    "measure: assumed positional bar (m-number of NOTATION.md, pickup = m1), as write_voice says; expression-marks/text never say positional or displayed.",
+    "Write commands' output field for 'compact notation of the touched bars' is not named in any spec; scenarios verify with a score_read step instead."
+  ]
+}

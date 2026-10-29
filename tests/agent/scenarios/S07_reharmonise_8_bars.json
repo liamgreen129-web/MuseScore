@@ -1,0 +1,344 @@
+{
+  "id": "S07",
+  "title": "Reharmonise 8 bars with chord symbols",
+  "source": "assessment.md Phase 2, S7",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/text.md add_chord_symbol"
+  ],
+  "steps": [
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "C6",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 3
+        },
+        "text": "Am7",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "text": "Dm9",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "text": "G13",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        },
+        "text": "Cmaj7",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 3
+        },
+        "text": "F6",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 4,
+          "beat": 1
+        },
+        "text": "G7",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 4,
+          "beat": 3
+        },
+        "text": "E7b9",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 5,
+          "beat": 1
+        },
+        "text": "A7",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 5,
+          "beat": 3
+        },
+        "text": "DmMaj7",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 6,
+          "beat": 1
+        },
+        "text": "C/G",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 6,
+          "beat": 3
+        },
+        "text": "C6",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 7,
+          "beat": 1
+        },
+        "text": "Ebdim7",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 7,
+          "beat": 3
+        },
+        "text": "E7#5",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 8,
+          "beat": 1
+        },
+        "text": "G13",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 8,
+          "beat": 3
+        },
+        "text": "Cmaj7",
+        "if_exists": "replace"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 8,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 h | {C6}:h {Am7}:h"
+            },
+            {
+              "contains": "m2 h | {Dm9}:h {G13}:h"
+            },
+            {
+              "contains": "m7 h | {Ebdim7}:h {E7#5}:h"
+            },
+            {
+              "contains": "m8 h | {G13}:h {Cmaj7}:h"
+            },
+            {
+              "contains": "m8 v1 | B4:w"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "C"
+      },
+      "error": "E_EXISTS",
+      "note": "if_exists defaults to error"
+    },
+    {
+      "tool": "add_chord_symbol",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": ""
+      },
+      "error": "E_EMPTY_TEXT"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S07_reharmonise_8_bars.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "add_chord_symbol with if_exists=replace is open question Q6 in text.md; S07 relies on replace working.",
+    "Printed spelling of chord symbols after a write (e.g. DmMaj7 vs Dmmaj7, C6 vs C6/9 normalisation): the fixture prints {Dmmaj7}; the read checks only symbols whose spelling is unambiguous.",
+    "16 separate calls = 16 undo entries; a batch would be one. The scenario keeps them separate so the undo invariant walks every state."
+  ]
+}

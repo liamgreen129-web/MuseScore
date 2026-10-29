@@ -1,0 +1,94 @@
+{
+  "id": "S12",
+  "title": "Tied notes across the bar line",
+  "source": "assessment.md Phase 2, S12",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/notes.md write_voice",
+    "specs/notes.md tie"
+  ],
+  "steps": [
+    {
+      "tool": "write_voice",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 1,
+        "toMeasure": 2,
+        "content": "E5:q G5:q A5:h~ | A5:q F5:q [C5,E5~]:h"
+      },
+      "note": "tie inside the write, and a chord-note tie out of m2 onto m3's first note E5"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 3,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | E5:q G5:q A5:h~"
+            },
+            {
+              "contains": "m2 v1 | A5:q F5:q [C5,E5~]:h"
+            },
+            {
+              "contains": "m3 v1 | E5:q D5:q C5:q A4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 4,
+        "content": "D5:q F5:q G5:q B4:q~"
+      },
+      "error": "E_TIE",
+      "note": "m5 starts with C#5, so the tie cannot land"
+    },
+    {
+      "tool": "write_voice",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 4,
+        "content": "D5:q~ F5:q G5:q B4:q"
+      },
+      "error": "E_TIE",
+      "note": "next event has a different pitch"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S12_ties_across_barline.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Tie out of the last written bar onto an existing note (notes.md: searchTieNote) vs. requiring tieFromPrevious on the next write: assumed allowed without a flag.",
+    "write_voice has tieFromPrevious (tie into the first written bar) but notes.md does not say whether a `~` on the last event of the written range is checked against the bar after it; assumed yes (E_TIE when it cannot land)."
+  ]
+}

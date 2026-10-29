@@ -1,0 +1,119 @@
+{
+  "id": "S03",
+  "title": "Slur across a system break",
+  "source": "assessment.md Phase 2, S3",
+  "fixture": "synthetic/spanners-system-break.mscz",
+  "specs": [
+    "specs/expression-lines.md add_slur"
+  ],
+  "steps": [
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 4,
+        "staves": [
+          2
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3 v1 | F3:h D3:h"
+            },
+            {
+              "contains": "m4 v1 | C3:h E3:h"
+            }
+          ]
+        }
+      },
+      "note": "before; system break after m3"
+    },
+    {
+      "tool": "add_slur",
+      "writes": true,
+      "args": {
+        "start": {
+          "measure": 3,
+          "beat": 3,
+          "staff": {
+            "part": "Piano",
+            "index": 2
+          },
+          "voice": 1
+        },
+        "end": {
+          "measure": 4,
+          "beat": 1,
+          "staff": {
+            "part": "Piano",
+            "index": 2
+          },
+          "voice": 1
+        }
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 4,
+        "staves": [
+          2
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3 v1 | F3:h (D3:h"
+            },
+            {
+              "contains": "m4 v1 | C3:h) E3:h"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_slur",
+      "args": {
+        "start": {
+          "measure": 4,
+          "beat": 1,
+          "staff": {
+            "part": "Piano",
+            "index": 2
+          },
+          "voice": 1
+        },
+        "end": {
+          "measure": 3,
+          "beat": 3,
+          "staff": {
+            "part": "Piano",
+            "index": 2
+          },
+          "voice": 1
+        }
+      },
+      "error": "E_",
+      "note": "end before start"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S03_slur_across_system_break.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "add_slur eventAddress staff.index: 1-based here, but write_voice's StaffRef uses staffIndex 0-based; the two shapes need unifying.",
+    "Error code for end-before-start slur not specified in expression-lines.md; the step only checks the E_ prefix."
+  ]
+}

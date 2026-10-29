@@ -1,0 +1,349 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+# MuseScore Agent: soak generator (P2.2, Gate G2/G3 soaks).
+#
+# Random schema-valid calls, generated from the build's own tools/list input schemas, against
+# random fixtures (fresh temp copies, one instance at a time), for a fixed time. After every
+# call: the instance is alive and score_validate shows no problem the fixture did not already
+# have. Every --check-every calls: undo to the start restores the original export, and redo
+# back restores the edited one (with no write tools in the build: the export is still the
+# original, i.e. reads changed nothing). Every event goes to a JSONL log; --replay re-runs a
+# log's launches and calls in order and reports any call whose outcome differs.
+#
+# Usage:
+#   python3 -I tests/agent/harness/soak.py --minutes 2 --seed 1 [--log soak.jsonl]
+#       [--fixtures name,...] [--calls-per-instance 60] [--check-every 10]
+#       [--exclude tool,...] [--undo-tool undo] [--redo-tool redo] [--bundle path]
+#   python3 -I tests/agent/harness/soak.py --replay soak.jsonl
+# Exit 1 on any crash, failed invariant or (replay) divergence.
+import argparse
+import json
+import pathlib
+import random
+import sys
+import tempfile
+import time
+
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))
+from harness.exports import compare  # noqa: E402
+from harness.instance import DEFAULT_BUNDLE, Instance, InstanceError, find_fixture, list_fixtures  # noqa: E402
+from harness.schemagen import Hints, generate  # noqa: E402
+
+READ_TOOLS = {"hello", "score_overview", "score_read", "score_validate", "score_changes", "score_export",
+              "score_render", "instances_list", "scores_list"}
+# never generated: they leave the score, touch files, or are what the invariants use
+DEFAULT_EXCLUDE = {"save", "score_open", "backup_snapshot", "cmd", "undo", "redo"}
+CHECK_FORMAT = "mscz"
+DEFAULT_LOG_DIR = pathlib.Path(tempfile.gettempdir()) / "musescore-agent-soak"
+
+
+def code_of(r):
+    if not r.is_error:
+        return ""
+    head = r.text.split(":", 1)[0].split()[0] if r.text else ""
+    return head
+
+
+def fixture_key(path):
+    return f"{path.parent.name}/{path.name}"
+
+
+class Log:
+    def __init__(self, path):
+        self.path = pathlib.Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.f = open(self.path, "w")
+        self.t0 = time.time()
+
+    def write(self, ev, **kw):
+        rec = {"ev": ev, "t": round(time.time() - self.t0, 3)}
+        rec.update(kw)
+        self.f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        self.f.flush()  # a crash of this script must not lose the tail
+
+    def close(self):
+        self.f.close()
+
+
+class Soak:
+    def __init__(self, a, log):
+        self.a = a
+        self.log = log
+        self.inst = None
+        self.failures = []
+        self.crashes = 0
+        self.calls = 0
+        self.instances = 0
+        self.initial = None
+        self.idx0 = None
+        self.problems0 = []
+
+    # --- instance lifecycle
+    def launch(self, fixture):
+        self.stop()
+        self.instances += 1
+        self.inst = Instance(fixture, bundle=self.a.bundle)
+        self.inst.start()
+        app = self.inst.hello().get("app", {})
+        self.log.write("launch", n=self.instances, fixture=fixture_key(fixture), pid=self.inst.pid,
+                       port=self.inst.port, revision=app.get("revision"))
+        v = self.inst.call("score_validate")
+        self.problems0 = v.structured.get("problems", [])
+        self.initial = self.inst.export(CHECK_FORMAT)
+        self.idx0 = self.inst.undo_index()
+
+    def stop(self):
+        if self.inst is not None:
+            self.inst.stop()
+            self.log.write("stop", n=self.instances)
+            self.inst = None
+
+    def fail(self, seq, what, detail):
+        self.failures.append((seq, what, detail))
+        self.log.write("fail", seq=seq, what=what, detail=str(detail)[:2000])
+        print(f"  FAIL  soak call {seq}: {what}  ({str(detail)[:300]})")
+
+    # --- one call and its checks
+    def do_call(self, seq, tool, args):
+        t0 = time.time()
+        try:
+            r = self.inst.call(tool, args)
+        except OSError as e:
+            r = None
+            err = f"{type(e).__name__}: {e}"
+        ms = int((time.time() - t0) * 1000)
+        self.calls += 1
+        if r is None:
+            self.log.write("call", seq=seq, tool=tool, args=args, isError=True, code="TRANSPORT", ms=ms, text=err)
+        else:
+            path = r.structured.get("path")
+            if isinstance(path, str):
+                self.inst.forget_export_file(path)
+            self.log.write("call", seq=seq, tool=tool, args=args, isError=r.is_error, code=code_of(r), ms=ms,
+                           text=r.text[:200] if r.is_error else "")
+        if not self.inst.alive():
+            self.crashes += 1
+            reports = self.inst.crash_reports()
+            self.log.write("crash", seq=seq, tool=tool, pid=self.inst.pid, reports=reports)
+            self.fail(seq, f"instance died after {tool}", f"crash reports: {reports}")
+            return r, False
+        v = self.inst.call("score_validate")
+        new = [p for p in v.structured.get("problems", []) if p not in self.problems0]
+        ok = not v.is_error and (v.structured.get("ok") is True or not new)
+        self.log.write("validate", seq=seq, ok=ok, new=new[:5])
+        if not ok:
+            self.fail(seq, f"score_validate after {tool}", v.text[:300] if v.is_error else new[:3])
+        return r, True
+
+    def undo_check(self, seq, has_undo):
+        """Undo to the start must restore the original export; redo back restores the edit."""
+        inst = self.inst
+        idx = inst.undo_index()
+        if idx == self.idx0:
+            diff = compare(CHECK_FORMAT, self.initial, inst.export(CHECK_FORMAT), "original", "now")
+            self.log.write("undo_check", seq=seq, result="FAIL" if diff else "ok", mode="no undo entries", diff=diff)
+            if diff:
+                self.fail(seq, "score changed without an undo entry", diff)
+            return
+        if not has_undo:
+            self.log.write("undo_check", seq=seq, result="skip", mode="no undo tool")
+            return
+        edited = inst.export(CHECK_FORMAT)
+        undo, redo = inst.tool_name(self.a.undo_tool), inst.tool_name(self.a.redo_tool)
+        steps = 0
+        while idx != self.idx0 and steps < 600:
+            r = inst.call(undo)
+            steps += 1
+            if r.is_error:
+                self.fail(seq, f"undo from state {idx}", r.text[:300])
+                return
+            idx = inst.undo_index()
+        diff = compare(CHECK_FORMAT, self.initial, inst.export(CHECK_FORMAT), "original", "after undo")
+        if diff:
+            self.fail(seq, f"undo to the start ({steps} steps) restores the original export", diff)
+        while steps > 0:
+            r = inst.call(redo)
+            steps -= 1
+            if r.is_error:
+                self.fail(seq, "redo back", r.text[:300])
+                return
+        diff2 = compare(CHECK_FORMAT, edited, inst.export(CHECK_FORMAT), "edited", "after redo")
+        if diff2:
+            self.fail(seq, "redo restores the edited export", diff2)
+        self.log.write("undo_check", seq=seq, result="FAIL" if (diff or diff2) else "ok", mode="undo/redo",
+                       entries=inst.undo_index() - self.idx0)
+
+
+def pick_args(tool, schema, rng, hints, tools):
+    if tool == "batch":  # a batch of random write operations
+        writes = [n for n in tools if n not in READ_TOOLS and n not in DEFAULT_EXCLUDE and n != "batch"
+                  and not n.startswith("_")]
+        ops = [{"command": c, "args": generate(tools[c].get("inputSchema", {}), rng, hints)}
+               for c in (rng.choice(writes) for _ in range(rng.randint(1, 5)))] if writes else []
+        args = generate(schema, rng, hints)
+        args["operations"] = ops
+        return args
+    return generate(schema, rng, hints)
+
+
+def run(a):
+    rng = random.Random(a.seed)
+    if a.fixtures:
+        fixtures = [find_fixture(n) for n in a.fixtures.split(",")]
+        if None in fixtures:
+            print(f"error: fixture not found: {a.fixtures}", file=sys.stderr)
+            return 2
+    else:
+        fixtures = list_fixtures()
+    if not fixtures:
+        print("error: no fixtures", file=sys.stderr)
+        return 2
+    log_path = pathlib.Path(a.log) if a.log else DEFAULT_LOG_DIR / f"soak-seed{a.seed}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    log = Log(log_path)
+    exclude = DEFAULT_EXCLUDE | set(filter(None, (a.exclude or "").split(",")))
+    log.write("start", seed=a.seed, minutes=a.minutes, bundle=str(a.bundle), exclude=sorted(exclude),
+              fixtures=[fixture_key(f) for f in fixtures], argv=sys.argv[1:])
+    s = Soak(a, log)
+    deadline = time.time() + a.minutes * 60
+    seq = 0
+    write_tools = []
+    try:
+        while time.time() < deadline:
+            fixture = rng.choice(fixtures)
+            try:
+                s.launch(fixture)
+            except InstanceError as e:
+                s.fail(seq, f"launch {fixture_key(fixture)}", e)
+                s.stop()
+                continue
+            tools = s.inst.tools()
+            names = sorted(n for n, t in tools.items() if t["name"] == n and n not in exclude and not n.startswith("_"))
+            has_undo = bool(s.inst.tool_name(a.undo_tool) and s.inst.tool_name(a.redo_tool))
+            write_tools = [n for n in names if n not in READ_TOOLS]
+            if write_tools == ["batch"]:  # nothing for a batch to run yet
+                names.remove("batch")
+                write_tools = []
+            if s.instances == 1:
+                print(f"tools: {len(names)} generated ({', '.join(names)}); write tools: {write_tools or 'none'}; "
+                      f"undo tool: {'yes' if has_undo else 'no'}")
+                log.write("tools", generated=names, writes=write_tools, undo=has_undo)
+            seq += 1
+            r, alive = s.do_call(seq, "score_overview", {})
+            if not alive:
+                continue
+            hints = Hints.from_overview(r.structured if r else {})
+            n_here = 0
+            while n_here < a.calls_per_instance and time.time() < deadline:
+                seq += 1
+                n_here += 1
+                tool = rng.choice(names)
+                args = pick_args(tool, tools[tool].get("inputSchema", {}), rng, hints, tools)
+                r, alive = s.do_call(seq, tool, args)
+                if not alive:
+                    break
+                if tool == "score_changes" or tool in write_tools:
+                    sv = (r.structured.get("stateVersion") if r else None)
+                    if isinstance(sv, int):
+                        hints.state_version = sv
+                if n_here % a.check_every == 0:
+                    s.undo_check(seq, has_undo)
+            if s.inst is not None and s.inst.alive():
+                s.undo_check(seq, has_undo)
+            s.stop()
+    except KeyboardInterrupt:
+        log.write("interrupted", seq=seq)
+    finally:
+        s.stop()
+        log.write("end", calls=s.calls, instances=s.instances, crashes=s.crashes, failures=len(s.failures))
+        log.close()
+
+    print(f"  {'ok  ' if not s.crashes else 'FAIL'}  soak: {s.calls} calls on {s.instances} instance(s), "
+          f"{s.crashes} crash(es)")
+    print(f"  {'ok  ' if not s.failures else 'FAIL'}  soak: invariants held "
+          f"({len(s.failures)} failure(s)){'' if write_tools else '; no write tools in the build, reads only'}")
+    print(f"log: {log_path}")
+    return 1 if (s.failures or s.crashes) else 0
+
+
+def replay(a):
+    src = pathlib.Path(a.replay)
+    events = [json.loads(line) for line in src.read_text().splitlines() if line.strip()]
+    start = next((e for e in events if e["ev"] == "start"), {})
+    if not a.bundle_given and start.get("bundle"):
+        a.bundle = start["bundle"]
+    out = Log(src.with_suffix(".replay.jsonl"))
+    out.write("start", replay_of=str(src), seed=start.get("seed"))
+    s = Soak(a, out)
+    diverged, matched = 0, 0
+    has_undo = False
+    try:
+        for e in events:
+            ev = e["ev"]
+            if ev == "launch":
+                fx = find_fixture(e["fixture"])
+                try:
+                    s.launch(fx)
+                except InstanceError as err:
+                    s.fail(-1, f"launch {e['fixture']}", err)
+                    s.inst = None
+                    continue
+                has_undo = bool(s.inst.tool_name(a.undo_tool) and s.inst.tool_name(a.redo_tool))
+            elif ev == "call":
+                if s.inst is None:
+                    continue
+                r, alive = s.do_call(e["seq"], e["tool"], e["args"])
+                got_err = True if r is None else r.is_error
+                got_code = "TRANSPORT" if r is None else code_of(r)
+                if (got_err, got_code) != (e["isError"], e["code"]):
+                    diverged += 1
+                    out.write("diverged", seq=e["seq"], tool=e["tool"], logged=[e["isError"], e["code"]],
+                              now=[got_err, got_code])
+                    print(f"  FAIL  replay call {e['seq']} {e['tool']}: logged {e['isError']} {e['code']!r}, "
+                          f"now {got_err} {got_code!r}")
+                else:
+                    matched += 1
+                if not alive:
+                    s.inst = None
+            elif ev == "undo_check" and s.inst is not None:
+                s.undo_check(e["seq"], has_undo)
+            elif ev == "stop":
+                s.stop()
+    finally:
+        s.stop()
+        out.write("end", matched=matched, diverged=diverged, crashes=s.crashes, failures=len(s.failures))
+        out.close()
+    logged_crashes = sum(1 for e in events if e["ev"] == "crash")
+    print(f"  {'ok  ' if not diverged else 'FAIL'}  replay: {matched} call(s) matched the log, {diverged} diverged")
+    print(f"  {'ok  ' if s.crashes == logged_crashes else 'FAIL'}  replay: {s.crashes} crash(es), log had {logged_crashes}")
+    print(f"  {'ok  ' if not s.failures else 'FAIL'}  replay: invariants ({len(s.failures)} failure(s))")
+    print(f"replay log: {out.path}")
+    # a replay that reproduces a logged crash is a successful reproduction
+    return 0 if (not diverged and s.crashes == logged_crashes and not
+                 [f for f in s.failures if not f[1].startswith("instance died")]) else 1
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--minutes", type=float, default=2)
+    ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--log")
+    ap.add_argument("--fixtures", help="comma-separated fixture names (default: all synthetic and corpus)")
+    ap.add_argument("--calls-per-instance", type=int, default=60)
+    ap.add_argument("--check-every", type=int, default=10)
+    ap.add_argument("--exclude", help="comma-separated tools never to generate (added to the defaults)")
+    ap.add_argument("--undo-tool", default="undo")
+    ap.add_argument("--redo-tool", default="redo")
+    ap.add_argument("--bundle")
+    ap.add_argument("--replay", metavar="LOG")
+    a = ap.parse_args()
+    a.bundle_given = bool(a.bundle)
+    a.bundle = a.bundle or str(DEFAULT_BUNDLE)
+    if not pathlib.Path(a.bundle).exists():
+        print(f"error: no bundle at {a.bundle}", file=sys.stderr)
+        return 2
+    return replay(a) if a.replay else run(a)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

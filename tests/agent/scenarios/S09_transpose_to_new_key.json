@@ -1,0 +1,85 @@
+{
+  "id": "S09",
+  "title": "Transpose to a new key with a key-signature change",
+  "source": "assessment.md Phase 2, S9",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/pitch.md transpose"
+  ],
+  "steps": [
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": "score",
+        "by": {
+          "key": -2,
+          "direction": "up"
+        },
+        "key_signatures": true
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "# s1 \"Soprano\" clef=treble key=g time=C"
+            },
+            {
+              "contains": "m2(1) v1 | Bb4:q C5:q D5:q+ferm F5:q"
+            }
+          ]
+        }
+      },
+      "note": "F# minor up a minor second to G minor"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          4
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | G3:q A3:q Bb3:q A3:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "score_overview",
+      "expect": {
+        "score.bars": 10
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S09_transpose_to_new_key.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "by.key is a concert key as sharps count; for a minor-key piece, -2 (two flats) means G minor here. pitch.md does not say how mode is handled (key is fifths only).",
+    "Header key spelling after transpose: assumed `key=g` (lower case = minor, NOTATION.md 6)."
+  ]
+}

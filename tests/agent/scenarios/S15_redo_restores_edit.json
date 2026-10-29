@@ -1,0 +1,136 @@
+{
+  "id": "S15",
+  "title": "Redo restores the edit",
+  "source": "assessment.md Phase 2, S15",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/session.md redo"
+  ],
+  "steps": [
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "f"
+      }
+    },
+    {
+      "tool": "write_voice",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Alto",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 2,
+        "content": "F#4:h E4:h"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          1,
+          2
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | A4:q+f"
+            },
+            {
+              "contains": "m2(1) v1 | F#4:q E4:q E4:q E4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 2,
+        "staves": [
+          2
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2(1) v1 | F#4:h E4:h"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "$redo",
+      "error": "E_NOTHING_TO_REDO"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Bass",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "p"
+      },
+      "note": "a new edit clears the redo stack"
+    },
+    {
+      "tool": "$redo",
+      "error": "E_NOTHING_TO_REDO"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S15_redo_restores_edit.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "The engine checks each $undo/$redo against the export recorded at that undo index, so 'restores' is byte-for-byte on the invariant format (mscz)."
+  ]
+}

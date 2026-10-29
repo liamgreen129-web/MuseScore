@@ -1,0 +1,19 @@
+{
+  "id": "R03",
+  "title": "Long quartet: whole-score read refused with a range that fits; bad arguments refused",
+  "source": "P2.2 read-only proof (test_read.py G1 section)",
+  "fixture": "corpus/beethoven-op74.mscz",
+  "steps": [
+    {"tool": "score_read", "error": "E_RANGE", "text": {"contains": " next"},
+     "capture": {"a": {"text": "read bars (\\d+)-", "int": true}, "b": {"text": "read bars \\d+-(\\d+)", "int": true}}},
+    {"tool": "score_read", "args": {"from": "${a}", "to": "${b}"}, "expect": {"from": "${a}", "to": "${b}"}},
+    {"tool": "score_read", "args": {"from": 5, "to": 2}, "error": "E_RANGE"},
+    {"tool": "score_read", "args": {"from": 1, "to": 99999}, "error": "E_RANGE"},
+    {"tool": "score_read", "args": {"from": 1, "to": 2, "staves": [9]}, "error": "E_RANGE"},
+    {"tool": "score_read", "args": {"from": 1, "to": 2, "pitch": "concert"}, "error": "E_INVALID_ARG"},
+    {"tool": "score_render", "args": {"page": 999}, "error": "E_RANGE"},
+    {"tool": "score_export", "args": {"format": "mscx"}, "error": "E_INVALID_ARG"},
+    {"assert": "undoIndex", "delta": 0}
+  ],
+  "invariants": {"validate": true, "undoRedo": false}
+}

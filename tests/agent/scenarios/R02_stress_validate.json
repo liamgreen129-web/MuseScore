@@ -1,0 +1,19 @@
+{
+  "id": "R02",
+  "title": "Combined stress score: validate is clean, reads succeed, mscz equals the golden",
+  "source": "P2.2 read-only proof",
+  "fixture": "synthetic/stress-combined.mscz",
+  "steps": [
+    {"tool": "score_validate", "expect": {"ok": true, "problems": {"len": 0}}},
+    {"tool": "score_overview", "expect": {"score.bars": 41, "parts": {"len": 5}}},
+    {"tool": "score_read", "args": {"from": 1, "to": 8}, "expect": {"from": 1, "to": 8, "text": {"contains": "# s1 "}}},
+    {"tool": "score_read", "args": {"from": 14, "to": 14, "staves": [6], "voices": [1]},
+     "expect": {"text": {"contains": "m14(13) v1 | {3:2 C3:q {3:2 D3:e E3:e F3:e} G3:q} r:q"}},
+     "note": "nested triplet in the cello, displayed bar 13"},
+    {"tool": "score_read", "args": {"from": 30, "pitch": "written"}, "expect": {"to": 41}},
+    {"tool": "score_validate", "args": {"from": 5, "to": 12}, "expect": {"ok": true, "from": 5, "to": 12}},
+    {"assert": "unchanged"}
+  ],
+  "goldens": [{"format": "mscz", "path": "goldens/R02_stress_combined.mscz"}],
+  "invariants": {"validate": true, "undoRedo": false}
+}

@@ -1,0 +1,131 @@
+{
+  "id": "S10",
+  "title": "Add lyrics with a melisma across a barline",
+  "source": "assessment.md Phase 2, S10",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/text.md add_lyric"
+  ],
+  "steps": [
+    {
+      "tool": "add_lyric",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "verse": 1,
+        "syllables": [
+          {
+            "text": "Sing",
+            "syllabic": "begin"
+          },
+          {
+            "text": "ing",
+            "syllabic": "end"
+          },
+          {
+            "text": "a"
+          },
+          {
+            "text": "song",
+            "melisma_to": {
+              "measure": 2,
+              "beat": 2
+            }
+          },
+          {
+            "text": "of"
+          },
+          {
+            "text": "joy"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | E5:q+ly\"Sing-\" G5:q+ly\"ing\" A5:q+ly\"a\" G5:q+ly\"song_\""
+            },
+            {
+              "contains": "m2 v1 | F5:q A5:q G5:q+ly\"of\" F5:q+ly\"joy\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "x"
+          }
+        ]
+      },
+      "error": "E_EXISTS"
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "a",
+            "melisma_to": {
+              "measure": 2,
+              "beat": 1
+            }
+          }
+        ]
+      },
+      "error": "E_BAD_ARG",
+      "note": "melisma ends before it starts"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S10_lyrics_melismas.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "add_lyric sequence semantics (next chord after a melisma) are a proposal in text.md; S10 assumes 'of' lands on the first chord after the melisma end (m2 beat 3).",
+    "The read form of a melisma that runs on: assumed `ly\"song_\"` on the first note only (NOTATION.md 5), nothing on the notes under the extender."
+  ]
+}

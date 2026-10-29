@@ -1,0 +1,165 @@
+{
+  "id": "S14",
+  "title": "Undo after each edit restores the previous export byte for byte",
+  "source": "assessment.md Phase 2, S14",
+  "fixture": "corpus/bach-bwv66-6.mscz",
+  "specs": [
+    "specs/session.md undo"
+  ],
+  "steps": [
+    {
+      "tool": "add_dynamic",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Alto",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "dynamic": "mf"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "add_hairpin",
+      "writes": true,
+      "args": {
+        "kind": "dim",
+        "staff": {
+          "part": "Tenor",
+          "index": 1
+        },
+        "from": {
+          "measure": 2,
+          "beat": 1
+        },
+        "to": {
+          "measure": 3,
+          "beat": 2
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "add_slur",
+      "writes": true,
+      "args": {
+        "start": {
+          "measure": 3,
+          "beat": 1,
+          "staff": {
+            "part": "Bass",
+            "index": 1
+          },
+          "voice": 1
+        },
+        "end": {
+          "measure": 3,
+          "beat": 2,
+          "staff": {
+            "part": "Bass",
+            "index": 1
+          },
+          "voice": 1
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "write_voice",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "staffIndex": 0
+        },
+        "voice": 1,
+        "fromMeasure": 4,
+        "content": "A4:q B4:q C#5:q+ferm A4:q"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Soprano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "text": "F#m"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": "score",
+        "by": {
+          "interval": "m3",
+          "direction": "down"
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$undo",
+      "error": "E_NOTHING_TO_UNDO"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 0
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S14_undo_each_edit.musicxml"
+    }
+  ],
+  "invariants": {
+    "undoRedo": false
+  },
+  "questions": [
+    "This is the explicit per-edit form; every other write scenario also runs the undo/redo invariant at the end.",
+    "E_NOTHING_TO_UNDO at index 0 assumes the agent's undo refuses rather than no-ops (session.md undo)."
+  ]
+}

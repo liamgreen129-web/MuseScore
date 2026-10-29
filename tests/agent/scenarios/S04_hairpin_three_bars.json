@@ -1,0 +1,89 @@
+{
+  "id": "S04",
+  "title": "Crescendo hairpin spanning three bars",
+  "source": "assessment.md Phase 2, S4",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/expression-marks.md add_hairpin"
+  ],
+  "steps": [
+    {
+      "tool": "add_hairpin",
+      "writes": true,
+      "args": {
+        "kind": "cresc",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "voice": 1,
+        "from": {
+          "measure": 1,
+          "beat": 1
+        },
+        "to": {
+          "measure": 3,
+          "beat": 4
+        }
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 4,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | E5:q+< G5:q A5:q G5:q"
+            },
+            {
+              "contains": "m3 v1 | E5:q D5:q C5:q A4:q+!"
+            },
+            {
+              "contains": "m4 v1 | D5:q F5:q G5:q B4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_hairpin",
+      "args": {
+        "kind": "dim",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "from": {
+          "measure": 3,
+          "beat": 1
+        },
+        "to": {
+          "measure": 1,
+          "beat": 1
+        }
+      },
+      "error": "E_EMPTY_SPAN"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/S04_hairpin_three_bars.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "add_hairpin 'to' is the last note under the hairpin (inclusive) and the printer puts `!` on the event that ends it; assumed the end mark prints on that last note (m3 beat 4), not on the next bar's downbeat.",
+    "expression-marks.md lists E_EMPTY_SPAN for end <= start; whether 'to' before 'from' is E_EMPTY_SPAN or E_RANGE is not stated."
+  ]
+}
