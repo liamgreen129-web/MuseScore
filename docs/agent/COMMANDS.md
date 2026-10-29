@@ -13,7 +13,7 @@ Status values: `—` not started · `spec` spec sheet done · `impl` implemented
 | `read` | score_overview, score_read, score_export, score_render, score_changes, score_validate | 1 | Conductor | — | — |
 | `notes` | write_voice, add_note_to_chord, remove_note, set_duration, tie, tuplet, grace, clear_range, exchange_voices, batch | 2 | Conductor | spec | — |
 | `pitch` | set_pitch, transpose | 2 | Wave A | spec | — |
-| `expression-marks` | add_dynamic, add_hairpin, add_articulation, add_ornament, add_fermata, add_breath | 2 | Wave A | — | — |
+| `expression-marks` | add_dynamic, add_hairpin, add_articulation, add_ornament, add_fermata, add_breath | 2 | Wave A | spec | — |
 | `expression-lines` | add_slur, add_line (pedal, ottava, trill, volta, text line) | 2 | Wave A | spec | — |
 | `text` | add_text (staff, system, expression, tempo, rehearsal), add_chord_symbol, add_lyric | 2 | Wave A | spec | — |
 | `structure` | insert_measures, remove_measures, split_measure, join_measures, set_time_signature, set_key_signature, set_tempo, set_barline, set_repeat, add_break, add_clef | 3 | Wave B | spec | — |

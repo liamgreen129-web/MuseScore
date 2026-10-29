@@ -22,7 +22,7 @@ expression-lines **F1–F8** (`docs/agent/specs/expression-lines.md`), notes **G
 | Edit | Keyboard / menu action | Palette (click with a selection) | Other |
 |---|---|---|---|
 | Dynamic | `add-dynamic` (Ctrl+D) → `toggleDynamicPopup` (`nac:338`, `ni:5880-5934`) | Dynamics palette (`src/palette/internal/palettecreator.cpp:238-262`) → `applyPaletteElement` | Dynamic popup (`src/notationscene/qml/MuseScore/NotationScene/elementpopups/dynamicpopupmodel.cpp:153-175`) |
-| Hairpin | `add-hairpin`, `add-hairpin-reverse` (`nac:339-341`, `nua:1270-1281`) → `addHairpinsToSelection` (`ni:5573-5589`) | Dynamics palette, hairpins (`palettecreator.cpp:264-281`) | Popup "add hairpin to dynamic" (`dynamicpopupmodel.cpp:177-214`), grip drag from a dynamic (`ni:5537-5571`) |
+| Hairpin | `add-hairpin`, `add-hairpin-reverse` (`nac:339-341`, `nua:1270-1281`) → `addHairpinsToSelection` (`ni:5573-5589`) | Dynamics palette, hairpins (`palettecreator.cpp:265-280`) | Popup "add hairpin to dynamic" (`dynamicpopupmodel.cpp:177-214`), grip drag from a dynamic (`ni:5537-5571`) |
 | Articulation | `add-staccato/-tenuto/-sforzato/-marcato` (`nac:178-181`) → `NotationActionController::toggleArticulation` (`nac:946-974`) → `toggleArticulationForSelection` (`ni:5688-5725`); `add-up-bow/-down-bow` (`nac:473-474`) → `NotationInteraction::toggleArticulation` (`ni:8279-8282`) | Articulations palette (`palettecreator.cpp:689-771`) | — |
 | Ornament | `add-turn`, `add-trill`, `add-mordent` … (`nac:458-471`) → `toggleOrnament` (`ni:8284-8287`) | Ornaments palette (`palettecreator.cpp:773-836`) | — |
 | Fermata | none (no `fermata` action in `nac` or `nua`) | Breaths & pauses palette (`palettecreator.cpp:949-981`) | — |
@@ -81,10 +81,10 @@ adding instead: the hairpin-grip dynamic (`ni:5895-5899`: `setTrack`, `setVoiceA
 
 **M7. Snapping, flipping and other cross-element behaviour is layout-time.** Hairpin↔dynamic snapping is decided in
 layout by `HairpinSegment::findStartDynamicOrExpression` / `findEndDynamicOrExpression`, which require the same
-`track`, `placement` and `VOICE_ASSIGNMENT` on both (`hairpin.cpp:360-413`, `415-470`). The popup's
+`track`, `placement` and `VOICE_ASSIGNMENT` on both (`hairpin.cpp:361-413`, `415-470`). The popup's
 `autoFlipHairpinsType` (`ni:5837-5878`, called at `dynamicpopupmodel.cpp:166`) reads `dynamicSnappedBefore/After`,
 which come from layout data (`hairpin.cpp:557-584`), so it cannot see hairpins or dynamics added earlier in the same
-transaction (G8). Ornament auxiliary notes and cue notes are computed during layout (`chord.cpp:1185-1199` →
+transaction (G8). Ornament auxiliary notes and cue notes are computed during layout (`chord.cpp:1186-1199` →
 `ornament.cpp:251-332`, `393-429`, called from `src/engraving/rendering/score/modifydom.cpp:81` via
 `measurelayout.cpp:999`), and the fermata glyph is flipped Above/Below in layout (`src/engraving/rendering/score/tlayout.cpp:1926-1935`).
 Post-conditions must use model fields (`subtype()`, tick, track), never layout results.
@@ -96,7 +96,7 @@ HAIRPIN, `6927` BREATH, `6928` DYNAMIC, `6945` FERMATA), so a clone goes to ever
 linked staff without the voice mapping when in voice 1 (`edit.cpp:7000-7007`); ARTICULATION, ORNAMENT, FERMATA and
 BREATH are not, so a voice 2–4 mark is skipped on a linked staff with no linked voice. DYNAMIC is skipped on linked
 staves whose `rstaff()` differs (`edit.cpp:7013-7036`). Branches: articulation family `edit.cpp:7054-7095`;
-segment-parented (dynamic, fermata) `edit.cpp:7133-7172`; spanners (hairpin) `edit.cpp:7188-7243`; breath
+segment-parented (dynamic, fermata) `edit.cpp:7133-7172`; spanners (hairpin) `edit.cpp:7188-7245`; breath
 `edit.cpp:7339-7352`. Edit the master score (G7).
 
 **M9. Plugin API comparison (cautionary).** `Cursor::add` (`src/engraving/api/v1/cursor.cpp:271-430`):
@@ -133,11 +133,11 @@ mocks: `git ls-files src/notation/tests`). Engraving-level coverage is listed pe
 - Palette (main UI route): Dynamics palette builds each element with `Dynamic::setDynamicType(String)`
   (`palettecreator.cpp:259-262`), which parses the name and sets both type and XML text
   (`dynamic.cpp:230-240`, `242-259`). `applyPaletteElement` → list selection: `filterTargetElements` returns the
-  selected elements (`src/engraving/dom/utils.cpp:1811-1878`) → `applyDropPaletteElement` per target
+  selected elements (`src/engraving/dom/utils.cpp:1811-1917`) → `applyDropPaletteElement` per target
   (`ni:2521-2525`); range selection: the TextBase branch drops one dynamic per staff on
   `firstSegment->firstElementForNavigation(staff)` (`ni:2665-2679`). Target `Note::drop` forwards to
   `Chord::drop` (`note.cpp:2099-2111`) → `ChordRest::drop` (`chord.cpp:1597-1598`); a `Rest` forwards to
-  `ChordRest::drop` (`rest.cpp:240-241`). `ChordRest::drop` DYNAMIC (`chordrest.cpp:285-290`): `setTrack(cr
+  `ChordRest::drop` (`rest.cpp:236-237`). `ChordRest::drop` DYNAMIC (`chordrest.cpp:285-290`): `setTrack(cr
   track)`, `checkVoiceAssignmentCompatibleWithTrack()`, parent = CR segment, `undoAddElement`. Then
   `setInitialTrackAndVoiceAssignment(target->track(), Ctrl)` (`ni:2816-2821`) and select (`ni:2823-2825`; Dynamic
   does not override `needStartEditingAfterSelecting`, `engravingitem.h:294`, so no edit mode).
@@ -201,7 +201,7 @@ The names are the `TConv` XML names (`src/engraving/types/typesconv.cpp:1362-143
   palette with a note selected adds a second dynamic (`chordrest.cpp:285-290` has no check).
 
 **Post-condition.** The CR segment's `annotations()` contains `d` (`Segment::add` pushes DYNAMIC to
-`m_annotations`, `segment.cpp:679+` case list incl. DYNAMIC); `d->dynamicType()` and `d->xmlText()` as requested;
+`m_annotations`, `segment.cpp:708`); `d->dynamicType()` and `d->xmlText()` as requested;
 `d->track()` and `getProperty(Pid::VOICE_ASSIGNMENT)` match M6; `velocity()` if given (`dynamic.cpp:142-145`); one
 linked clone per linked staff that M8 says should get one (`d->linkList()`).
 
@@ -264,7 +264,7 @@ fixture `textbase_data/createDynamic-ref.mscx`), `:67-110` (dynamic text editing
   `undoAddElement` (`edit.cpp:4406`).
 - Palette (list selection of one CR or two CRs on one staff): `score->addHairpin(clone, cr1, cr2)` then
   `setInitialTrackAndVoiceAssignment(cr1->track(), Ctrl)` (`ni:2458-2486`). The palette hairpin elements are set
-  only with `setHairpinType` (`palettecreator.cpp:271-280`), so palette cresc./dim. lines get their text from
+  only with `setHairpinType` (`palettecreator.cpp:272-280`), so palette cresc./dim. lines get their text from
   style, not from `edit.cpp:4340-4346`. Range selection: `cmdAddSpanner` per staff with voice-1 track and
   `startSegment`/`endSegment` ticks (`ni:2646-2662`, `cmd.cpp:603-633`).
 - From a dynamic (popup): `Score::addHairpinToDynamic(hairpin, dynamic)` (`edit.cpp:4409-4446`): starts at the
@@ -319,8 +319,8 @@ No segments exist until commit (F2); `segmentsEmpty()` is expected to be true.
 **Nested commands.** None (M3). Safe under the lock. `addHairpinsToSelection`'s post-apply grip edit is skipped
 because `segmentsEmpty()` is true under the lock (`ni:5583`).
 
-**Linked parts / excerpts.** Spanner branch (`edit.cpp:7188-7243`): clone per linked staff with `track` /
-`track2` = linked track (`edit.cpp:7200-7204`). HAIRPIN is a voice-1 copy type (M8). `setInitialTrackAndVoiceAssignment`
+**Linked parts / excerpts.** Spanner branch (`edit.cpp:7188-7245`): clone per linked staff with `track` /
+`track2` = linked track (`edit.cpp:7201-7204`). HAIRPIN is a voice-1 copy type (M8). `setInitialTrackAndVoiceAssignment`
 after the add changes only the master (M6): with the preference on and a `cr1` in voice 2–4, the master moves to
 voice 1 while part clones stay on the CR's voice with `ALL_VOICE_IN_INSTRUMENT`. With `cr1` in voice 1 there is no
 difference. Snapping to dynamics in the part then depends on those fields matching (M7).
@@ -372,7 +372,7 @@ calls `addHairpin*`.
    added (`cmd.cpp:2473-2487`). Per-chord toggle: a mixed selection ends mixed.
 3. **Palette** (`palettecreator.cpp:689-771`): list → `applyDropPaletteElement` on each selected note
    (`ni:2521-2525`; a selected articulation means its chord, `ni:2490-2500`); range → one note per chord, honouring
-   the selection filter (`ni:2734-2747`, `2750-2769`), skipping barlines (`ni:2758`). `Note::drop` → `Chord::drop`
+   the selection filter (`ni:2735-2748`, `2750-2769`), skipping barlines (`ni:2758`). `Note::drop` → `Chord::drop`
    (`note.cpp:2111`) → ARTICULATION branch (`chord.cpp:1473-1525`): if the chord already has the same subtype, the
    existing one is **selected and nothing changes** (`chord.cpp:1477-1483`); else the anchor is inferred from the
    chord's explicitly anchored articulations (`chord.cpp:1486-1512`); if the chord has no articulations the new one
@@ -417,13 +417,13 @@ mode)` directly (`chord.h:304`), with `mode` computed as `ni:5706-5707` does.
   "oneOf": [{"required": ["at"]}, {"required": ["range"]}]
 }
 ```
-The enum is the master Articulations palette list (`palettecreator.cpp:719-756`, Above forms); the name-to-SymId
+The enum is the master Articulations palette list (`palettecreator.cpp:722-762`, Above forms); the name-to-SymId
 table is the implementer's.
 
 **Validation before mutation.**
 - Target resolves to a CR (`E_NO_CHORDREST`); it must be a **Chord** (`E_NOT_A_CHORD`): every UI path ignores rests
   (`Score::toggleArticulation(el,a)` returns false for non-chords, `cmd.cpp:2446-2452`; `toggleArticulationForSelection`
-  uses notes only, `ni:5694`; `Rest::acceptDrop` does not accept ARTICULATION, `rest.cpp:161-188`, and
+  uses notes only, `ni:5694`; `Rest::acceptDrop` does not accept ARTICULATION, `rest.cpp:161-187`, and
   `Rest::drop` deletes it, `rest.cpp:196-204`).
 - Grace chords are valid targets (the selection's note gives `note->chord()` = the grace chord, `cmd.cpp:2446-2447`);
   linked copies use `findLinkedChord` (`edit.cpp:7082-7083`).
@@ -484,11 +484,11 @@ fixtures), read-compat `compat206_data/articulations-double.mscx` (combined symb
   (`ni:8284-8287`) → `Score::toggleOrnament(SymId)` (`cmd.cpp:2175-2199`): same loop as articulations but builds an
   `Ornament` (`Factory::createOrnament`, `cmd.cpp:2188`) and calls `Score::toggleArticulation(el, ornament)`
   (`cmd.cpp:2190`) — **toggle**: adding the same ornament again removes it (`cmd.cpp:2453-2457`).
-- Palette (`palettecreator.cpp:773-819`) → `Chord::drop` ORNAMENT, same branch as articulations
+- Palette (`palettecreator.cpp:773-821`) → `Chord::drop` ORNAMENT, same branch as articulations
   (`chord.cpp:1473-1525`): add, never remove.
 - **Ornament vs trill line.** `add-trill` adds the `ornamentTrill` *symbol* as an Ornament on the chord
-  (`nac:463`). The trill *line* is a `Trill` spanner from the same palette (`palettecreator.cpp:821-834`) and
-  belongs to `add_line kind=trill` (expression-lines). A trill line owns its own Ornament (`chord.cpp:1192-1199`).
+  (`nac:463`). The trill *line* is a `Trill` spanner from the same palette (`palettecreator.cpp:823-833`) and
+  belongs to `add_line kind=trill` (expression-lines). A trill line owns its own Ornament (`chord.cpp:1193-1199`).
   Adding an `ornamentTrill` to a chord that starts a trill line is not prevented by any path above.
 
 **Recommended call.** As add_articulation, with `Factory::createOrnament(score->dummy()->chord())`
@@ -520,7 +520,7 @@ fixtures), read-compat `compat206_data/articulations-double.mscx` (combined symb
   "oneOf": [{"required": ["at"]}, {"required": ["range"]}]
 }
 ```
-Enum = master Ornaments palette (`palettecreator.cpp:792-806`); `shake` = `ornamentShake3`, `shake_muffat` =
+Enum = master Ornaments palette (`palettecreator.cpp:790-814`); `shake` = `ornamentShake3`, `shake_muffat` =
 `ornamentShakeMuffat1` as the actions use (`nac:469-470`). The interval/accidental fields depend on Q13.
 
 **Validation before mutation.** As add_articulation (`E_NO_CHORDREST`, `E_NOT_A_CHORD`: `toggleOrnament` acts only on
@@ -533,8 +533,8 @@ Do not check `noteAbove()`, `cueNoteChord()` or accidentals before commit (M7).
 
 **Nested commands.** None at add time (M3). At commit, layout (`ModifyDom::cmdUpdateNotes`) runs
 `Ornament::computeNotesAboveAndBelow`, which may call `undoRemoveElement` on a cloned note's tie
-(`ornament.cpp:273-278`) and, when a cue note is shown, `Score::cmdAddParenthesesToNotes` →
-`undoChangeProperty` (`ornament.cpp:419-420`, `cmd.cpp:3586-3602`). These run inside `endCmd` before the macro
+(`ornament.cpp:280-283`) and, when a cue note is shown, `Score::cmdAddParenthesesToNotes` →
+`undoChangeProperty` (`ornament.cpp:421-422`, `cmd.cpp:3586-3602`). These run inside `endCmd` before the macro
 closes (text §0.4), so they land in the agent's undo entry.
 
 **Linked parts / excerpts.** As add_articulation (articulation-family branch, `edit.cpp:7054-7095`). The Ornament
@@ -563,14 +563,14 @@ calls `toggleOrnament`.
 **UI entry point.** Palette only (Breaths & pauses, `palettecreator.cpp:949-981`; elements built with
 `Factory::makeFermata` + `setSymIdAndTimeStretch`, `palettecreator.cpp:976-980`).
 - On a note/chord/rest (`Note::acceptDrop` defers to `ChordRest::acceptDrop`, which accepts FERMATA,
-  `note.cpp:1794`, `chordrest.cpp:151`) → `ChordRest::drop` FERMATA (`chordrest.cpp:257-283`): placement = below for
+  `note.cpp:1798`, `chordrest.cpp:151`) → `ChordRest::drop` FERMATA (`chordrest.cpp:257-283`): placement = below for
   even voices 2/4 (`track & 1`), else above (`chordrest.cpp:258`); if a Fermata on the same track is already in the
   segment's annotations: same `subtype()` → **no change** (the new one is deleted, `chordrest.cpp:261-263`);
   different subtype → **replaced** via `undoChangeElement` keeping the old placement (`chordrest.cpp:264-270`);
   otherwise track and parent = the CR's, `undoAddElement` (`chordrest.cpp:280-283`).
 - On a barline: `BarLine::acceptDrop` accepts a fermata only on an end-barline segment (`barline.cpp:379-380`);
   `BarLine::drop` has the same no-change/replace/add logic with the barline's track and segment
-  (`barline.cpp:455-477`).
+  (`barline.cpp:458-477`).
 - Range selection: every chord and rest in the range gets one (`ni:2750-2769`, `placeMultiple` default true,
   `engravingitem.h:229`); barlines inside a range are skipped (`ni:2757-2759`).
 
@@ -579,7 +579,7 @@ calls `toggleOrnament`.
 Fermata* f = Factory::createFermata(score->dummy()->segment());   // factory.h:102
 f->setSymIdAndTimeStretch(symAbove);     // fermata.cpp:261-265 — call exactly once on a fresh fermata
 EditData ed; ed.dropElement = f;
-target->drop(ed);                        // ChordRest::drop (chordrest.cpp:257-283) or BarLine::drop (barline.cpp:455-477)
+target->drop(ed);                        // ChordRest::drop (chordrest.cpp:257-283) or BarLine::drop (barline.cpp:458-477)
 ```
 `setSymIdAndTimeStretch` sets the time stretch to the type's default only if it is −1 and **resets it to −1
 otherwise** (`fermata.cpp:264`; initial value −1, `fermata.h:95`), so a second call clears the stretch. Defaults:
@@ -610,7 +610,7 @@ Names map to the master palette list (`palettecreator.cpp:966-974`; FermataType 
 
 **Validation before mutation.**
 - `at`: CR at the exact tick on the track (`E_NO_CHORDREST`); rests are valid (the UI accepts them,
-  `chordrest.cpp:151`, `rest.cpp:186-187`).
+  `chordrest.cpp:151`, `rest.cpp:186`).
 - `barline`: the measure's `EndBarLine` segment at `measure->endTick()` must exist and hold a BarLine on
   `staffIdx * VOICES` (`E_NO_BARLINE`), matching `barline.cpp:379-380`. A mid-measure barline is refused (same
   check).
@@ -674,7 +674,7 @@ EditData ed; ed.dropElement = b;
 cr->drop(ed);                     // chordrest.cpp:197-211
 ```
 The palette sets `pause` explicitly (`palettecreator.cpp:989`); `Factory::createBreath` leaves it 0.0
-(`breath.cpp:59-63`), so a caesura without `setPause` has no playback pause.
+(`breath.cpp:56-61`), so a caesura without `setPause` has no playback pause.
 
 **Selection set-up.** None.
 
@@ -701,18 +701,18 @@ CR on the track whose `endTick() == T`; there is no UI path that places a breath
   "after" position; refuse (`E_GRACE`) — the UI result there was not traced (Q9).
 - **Existing breath at that segment and track: must be checked.** `ChordRest::drop` has no duplicate check
   (`chordrest.cpp:197-211`). `Segment::add` stores a BREATH in the per-track slot and only logs when the slot is
-  occupied (`segment.cpp:829-836`, `checkElement` `segment.cpp:657-672` logs with `LOGD`, abort commented out), so
+  occupied (`segment.cpp:830-837`, `checkElement` `segment.cpp:657-673` logs with `LOGD`, `abort()` commented out at `:671`), so
   the first breath drops out of `m_elist` while still parented to the segment; undoing the second add clears the
   slot (`segment.cpp:986-987`), leaving neither visible. Look up
   `cr->measure()->findSegment(SegmentType::Breath, cr->endTick())->element(track)` first; then no-op, replace (change
-  `Pid::SYMBOL` and `Pid::PAUSE` with `undoChangeProperty`, `breath.cpp:97-121`), or `E_EXISTS` (Q9).
+  `Pid::SYMBOL` and `Pid::PAUSE` with `undoChangeProperty`, `breath.cpp:106-125`), or `E_EXISTS` (Q9).
 - `pause` ≥ 0.
 
 **Post-condition.** `cr->measure()->findSegment(SegmentType::Breath, cr->endTick())` exists and its `element(track)`
 is a Breath with the requested `symId()` and `pause()`. For a CR that ends at the measure end, the segment is in the
 CR's own measure at tick `measure->endTick()` (`chordrest.cpp:207`).
 
-**Nested commands.** None (M3). `Breath::added()`/`removed()` call `setUpTempoMapLater()` (`breath.cpp:178-194`);
+**Nested commands.** None (M3). `Breath::added()`/`removed()` call `setUpTempoMapLater()` (`breath.cpp:179-195`);
 the tempo map reads breath pauses from the master only (`score.cpp:530-563`).
 
 **Linked parts / excerpts.** Breath branch (`edit.cpp:7339-7352`): for every staff, including the original, the
