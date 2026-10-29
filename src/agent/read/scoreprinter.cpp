@@ -216,6 +216,20 @@ SpannerMarks collectSpanners(const Score* score)
         const EngravingItem* ee = s->endElement();
         const ChordRest* scr = (se && se->isChordRest()) ? toChordRest(se) : s->startCR();
         const ChordRest* ecr = (ee && ee->isChordRest()) ? toChordRest(ee) : s->endCR();
+        if (!s->isSlur()) {
+            // NOTATION.md: an end mark goes on the last event the line covers. A line's endElement
+            // is the event starting at tick2 (Spanner::doComputeEndElement, spanner.cpp:791), one
+            // too far, and missing when the line runs to the end of the score; Ottava finds its
+            // end the way used here (ottava.cpp:464-466): the event ending at or before tick2.
+            const staff_idx_t si = track2staff(s->track());
+            const ChordRest* last = score->findChordRestEndingBeforeTickInStaffAndVoice(s->tick2(), si, track2voice(s->track()));
+            if (!last || last->tick() < s->tick()) {
+                last = score->findChordRestEndingBeforeTickInStaff(s->tick2(), si);
+            }
+            if (last && last->tick() >= s->tick()) {
+                ecr = last;
+            }
+        }
         if (!scr || !ecr) {
             continue;
         }
