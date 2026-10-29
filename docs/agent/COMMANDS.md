@@ -18,7 +18,7 @@ Status values: `—` not started · `spec` spec sheet done · `impl` implemented
 | `text` | add_text (staff, system, expression, tempo, rehearsal), add_chord_symbol, add_lyric | 2 | Wave A | spec | — |
 | `structure` | insert_measures, remove_measures, split_measure, join_measures, set_time_signature, set_key_signature, set_tempo, set_barline, set_repeat, add_break, add_clef | 3 | Wave B | spec | — |
 | `instrumentation` | add_part, remove_part, rename_part, set_instrument, add_staff, set_staff_type, set_transposition | 3 | Wave B | — | — |
-| `generic` | set_property, remove, select, cmd (allow-listed) | 3 | Wave B | — | — |
+| `generic` | set_property, remove, select, cmd (allow-listed) | 3 | Wave B | spec | — |
 | `style-layout` | set_style, set_measure_stretch, lock_systems, set_offset | 3 | Wave B | — | — |
 
 Scouting order for P0.S (highest risk first): `notes`, `expression-lines`,
