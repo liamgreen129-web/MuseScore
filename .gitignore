@@ -87,3 +87,4 @@ __pycache__/
 tests/fixtures/real/
 build.log
 agent.install/
+g0-snapshot/
