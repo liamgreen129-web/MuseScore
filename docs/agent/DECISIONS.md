@@ -72,3 +72,8 @@
 - 2026-10-29 · Port base 2412 (PLAN P1.1) supersedes the assessment's 2212 · upstream's default would clash with a future official 5.x.
 - 2026-10-29 · Open for P1.2: base-port takeover when the holding instance quits (session Q2); `stateVersion` cannot be the undo index, which repeats after undo + new edit (session Q1).
 - 2026-10-29 · Agent undo/redo must refuse during a user drag, text edit or open batch, and take an expected action name, so a request that changed nothing can't undo the user's last edit (session spec, undo/redo).
+- 2026-10-29 · read spec sheet accepted; **P0.S complete (11/11 sheets)**.
+- 2026-10-29 · **Hard rule: never write `.mscx` through MscWriter / the registered mscx writer to a user path** · verified `containerPath()` returns the parent directory for `.mscx` (infrastructure/mscio.h:74-80) and MscWriter then `removeRecursively()`s it (mscwriter.cpp:335-338): exporting `~/Desktop/x.mscx` would empty the Desktop. score_export writes mscx as score XML into a memory buffer, or into a fresh dedicated temp subfolder only.
+- 2026-10-29 · Handles: EIDs are keyed by object address, so a new object at a freed address inherits a dead object's EID; the "register maps to this object" check is not enough. P2.1 needs a per-type identity fingerprint (read Q3). `itemFromEID` / `EID::fromStdString` assert on bad input, so validate handles before lookup.
+- 2026-10-29 · `stateVersion` = a module-owned counter bumped from `changesChannel`, not the undo index (read + session agree).
+- 2026-10-29 · score_validate cannot call `sanityCheck`/`checkSpanner` as-is (they mutate outside undo); decide at P1.7 between reimplementing read-only or accepting the repair.
