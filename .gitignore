@@ -86,3 +86,4 @@ __pycache__/
 .claude/settings.local.json
 tests/fixtures/real/
 build.log
+agent.install/

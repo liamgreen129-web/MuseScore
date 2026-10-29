@@ -30,3 +30,15 @@
 - 2026-10-29 · settings.json deny rules now cover `/Applications/MuseScore 4.app`, the old `MuseScore Studio 4.app` name, and `/usr/local/lib/libMuseSampler*` · preflight found the real paths.
 - 2026-10-29 · Brew installed cmake 4.4.5, ninja 1.13.2, wget 1.25.0, p7zip 17.05, ccache 4.14.2 · [verify] at first configure: cmake 4.x removed compatibility with `cmake_minimum_required` < 3.5; if any thirdparty CMakeLists trips on it, add `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` in scripts/build.sh.
 - 2026-10-29 · Implementers in parallel: max 1 on the MacBook Pro (16 GB RAM, 41 GB free); max 2 stays the rule on the mini.
+
+## P0.2 finished, P0.4 drafted (2026-10-29)
+
+- 2026-10-29 · Qt 6.10.2 (CI archive) in ~/Qt/6.10.2/macos, prebuilt deps in ~/musescore_deps_macos · downloads were 78 MB and 2 MB, not >1 GB; Qt unpacks to 561 MB. qmake reports 6.10.2.
+- 2026-10-29 · [verify resolved] The .app bundle is named from OUTPUT_NAME = EXECUTABLE_NAME (mscore → `mscore.app`), not the title · install.sh must copy it to `/Applications/MuseScore Agent.app`.
+- 2026-10-29 · [verify resolved] Release mode turns MUSE_APP_UNSTABLE off (SetupConfigure.cmake:66), so the `#else` branches of main.cpp and ipc.h are the ones built; the patch changes both branches anyway.
+- 2026-10-29 · Window title also changed (MUSE_APP_TITLE "MuseScore Agent" in version.cmake) · it also sets the bundle display name; the only other uses are Windows/Linux packaging.
+- 2026-10-29 · Added beyond PHASE0 §3: document types moved from UTExportedTypeDeclarations to UTImportedTypeDeclarations · two apps exporting the same UTIs lets macOS pick either as the type's owner.
+- 2026-10-29 · Added beyond PHASE0 §3: URL scheme `musescore` → `musescore-agent` · otherwise musescore:// links from the web could open in the agent build; in-app `musescore://` page URIs are internal routing and unaffected.
+- 2026-10-29 · Update module off and crashpad off stay build options (scripts/build.sh), not source edits · ninja_build.sh already defaults crashpad OFF.
+- 2026-10-29 · check-identity.sh has 10 checks; run against the official 4.7.4 app it fails all 10 as expected.
+- 2026-10-29 · Found a sixth shared item: the Quick Look extension (`src/macos_integration`, id `org.musescore.MuseScore.QuickLookPreviewExtension`, built by default via MUE_BUILD_MACOS_INTEGRATION=ON) · a second copy with the same id could take over Finder previews of .mscz. Turn it off with `-DMUE_BUILD_MACOS_INTEGRATION=OFF`, seeded into build.release's CMake cache by scripts/build.sh before ninja_build.sh runs (ninja_build.sh has no pass-through for extra cmake options and doesn't override cached ones). The same seeding carries the ccache launcher. check-identity.sh now fails on any embedded .appex with an org.musescore.* id.
