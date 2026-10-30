@@ -2,7 +2,7 @@
 
 Updated by the conductor at the end of every session and before every STOP.
 
-- **Machine:** MacBook Pro (M1 Pro, 16 GB) for now; Mac mini later (DECISIONS 2026-10-29)
+- **Machine:** moving to the Mac mini: follow docs/agent/MACMINI.md (preflight, installs, clone agent/4.7-nfhpdz, scripts/make-signing-identity.sh, first build, verify, merge)
 - **Phase:** 2
 - **Current task:** cloud session (2026-10-30) on branch `agent/4.7-nfhpdz` is at a clean point, waiting for the Mac run. Linux here, no build possible (Qt cannot be downloaded: DECISIONS 2026-10-30). Everything on this branch is **unverified** until it is rebuilt and tested on the Mac.
 - **Last finished (cloud, unverified):** Wave A is complete in code: notes (all ten commands), expression-lines, expression-marks, text (add_text, add_chord_symbol, add_lyric) and pitch (set_pitch, transpose), all registered in allcommands.cpp. Each group was reviewed twice by the reviewer agent, and every finding is fixed or recorded in DECISIONS. Also done: printer marks for system lines, tempo text without SMuFL symbols, the test_modal hook (S18), the expression groups moved onto address/address.h, MCP schemas with no "type" for any-typed arguments, specs/pitch.md and specs/text.md corrected, and the scenarios README.
