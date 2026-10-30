@@ -38,6 +38,7 @@
 #include "engraving/dom/note.h"
 #include "engraving/dom/ottava.h"
 #include "engraving/dom/pedal.h"
+#include "engraving/dom/rest.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/slur.h"
 #include "engraving/dom/spanner.h"
@@ -601,8 +602,22 @@ TEST_F(Agent_ExpressionLines, StaffAndSystemTextLines)
     EXPECT_EQ(s->endText(), u"end");
     EXPECT_EQ(s->endHookType(), HookType::NONE);
     EXPECT_EQ(countAll(score.get(), ElementType::TEXTLINE), lines0 + 1 + 4);
+    // score_read shows the system line on the top staff (it is anchored to a segment, not a chord)
+    auto topBar1 = [&] {
+        read::ReadOptions o;
+        o.fromBar = 1;
+        o.toBar = 1;
+        o.staves = { 1 };
+        return mu::agent::notation::write(read::printScore(score.get(), o));
+    };
+    EXPECT_TRUE(contains(topBar1(), "+txt[")) << topBar1();
+    EXPECT_TRUE(contains(topBar1(), "+txt]")) << topBar1();
     undo();
     EXPECT_EQ(countAll(score.get(), ElementType::TEXTLINE), lines0 + 1);
+    EXPECT_FALSE(contains(topBar1(), "+txt")) << topBar1();
+    redo();
+    EXPECT_TRUE(contains(topBar1(), "+txt[")) << topBar1();
+    undo();
 }
 
 TEST_F(Agent_ExpressionLines, LineErrors)
@@ -847,3 +862,45 @@ TEST_F(Agent_ExpressionLines, PlacementIsReadBack)
     EXPECT_EQ(toSpanner(resolveHandle(score.get(), o.str("handle")).val)->placement(), PlacementV::ABOVE);
 }
 
+
+// the shared address shape (address/address.h, DECISIONS 2026-10-30): offset, {number}, part names in any
+// case; beats off a tick, below 1 or past the bar, and gap rests are refused
+TEST_F(Agent_ExpressionLines, SharedAddressShape)
+{
+    open("parts-linked.mscz");
+    const Val ok = pos(1, 3, 1);
+    {
+        ValMap m = pos(1, 2, 1).toMap();
+        m.erase("beat");
+        m["offset"] = Val("1/4");
+        ASSERT_TRUE(slur(slurArgs(Val(m), ok)).ret);
+        undo();
+        m["offset"] = Val("x");
+        expectErr(slur(slurArgs(Val(m), ok)), AErr::InvalidArg, "fraction");
+        m["beat"] = Val(2.0);
+        m["offset"] = Val("1/4");
+        expectErr(slur(slurArgs(Val(m), ok)), AErr::InvalidArg, "one of beat");
+    }
+    expectErr(slur(slurArgs(pos(1, 1.3333, 1), ok)), AErr::InvalidArg, "does not fall on a tick");
+    expectErr(slur(slurArgs(pos(1, 0.5, 1), ok)), AErr::InvalidArg, "from 1");
+    {
+        ValMap m = pos(1, 2, 1).toMap();
+        m.erase("beat");
+        m["tick"] = Val(99999.0);
+        expectErr(slur(slurArgs(Val(m), ok)), AErr::Range, "past its end");
+    }
+    {
+        ValMap staff;
+        staff["number"] = Val(1.0);
+        ASSERT_TRUE(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)).ret);
+        undo();
+    }
+    ASSERT_TRUE(slur(slurArgs(partPos(1, 2, "flute"), partPos(1, 3, "FLUTE"))).ret);
+    undo();
+    // a gap rest (space in a voice) is not an event: the Clarinet's m1 rest made a gap for the test
+    ChordRest* r = crAt(score.get(), 1, 0, 2);
+    ASSERT_TRUE(r && r->isRest());
+    toRest(r)->setGap(true);
+    expectErr(slur(slurArgs(pos(1, 1, 2), pos(1, 2, 2))), AErr::Range, "no note or rest starts");
+    toRest(r)->setGap(false);
+}

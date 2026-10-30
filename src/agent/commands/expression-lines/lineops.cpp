@@ -259,7 +259,7 @@ RetVal<EventRef> resolveEvent(MasterScore* score, const Val& v, const std::strin
     Measure* measure = nullptr;
     Fraction tick;
     if (Ret r = address::resolvePosition(score, Val(pos), what, measure, tick); !r) {
-        return fail(r);
+        return fail(named(r, what));
     }
     const int bar = address::barOf(score, measure);
     const std::string place = "m" + std::to_string(bar) + " beat " + beatText(measure, tick) + " s" + std::to_string(staff.val + 1)
@@ -318,7 +318,7 @@ RetVal<Measure*> resolveBar(MasterScore* score, const Val& v, const std::string&
         return rv;
     }
     for (const auto& [k, val] : m) {
-        if (k == "beat" || k == "tick" || k == "grace") {
+        if (k == "beat" || k == "offset" || k == "tick" || k == "grace") {
             rv.ret = makeErr(Err::InvalidArg, what + ": a volta covers whole bars, so give {measure} only (no " + k + ")");
             return rv;
         }

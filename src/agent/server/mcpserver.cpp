@@ -111,7 +111,9 @@ static std::map<std::string, Val> toArgs(const JsonObject& obj)
 static JsonObject propertyToJson(const Property& property, bool withLimits)
 {
     JsonObject propertyObj;
-    propertyObj["type"] = to_string(property.type);
+    if (property.type != DataType::Undefined) { // any type (e.g. a handle string or an address object): no "type"
+        propertyObj["type"] = to_string(property.type);
+    }
     propertyObj["description"] = property.description;
     if (withLimits) {
         if (!property.minimum.isNull()) {

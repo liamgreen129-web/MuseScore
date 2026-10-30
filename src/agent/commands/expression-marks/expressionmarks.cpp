@@ -235,6 +235,7 @@ bool isWhole(const Val& v)
 
 // ------------------------------------------------------------------ addressing (address/address.h)
 
+using address::allMeasures;
 using address::barOf;
 using address::beatOf;
 using address::chordRestAt;

@@ -28,10 +28,12 @@ namespace {
 const char* EVENT_ADDRESS
     = "An event (chord, note or rest), as an object: either {\"handle\": \"<handle from score_read detail or an earlier "
       "command>\"} or a position {\"measure\": <bar number as score_read prints it, m<N>, pickup = 1>, \"beat\": <1-based, in "
-      "quarter notes from the start of the bar, e.g. 1, 2.5; default 1>, or instead \"tick\": <ticks from the start of the "
-      "bar, 480 per quarter, for tuplet positions>, \"staff\": <staff number as in score_read's s<N>, or {\"part\": \"<part "
-      "name>\", \"index\": <1-based staff within the part, default 1>}>, \"voice\": <1-4, default 1>, \"grace\": <optional "
-      "1-based index of a grace chord of that chord, in score order>}. A chord or rest must start exactly there.";
+      "quarter notes from the start of the bar, e.g. 1, 2.5; default 1; must fall on a tick>, or instead \"offset\": "
+      "\"<n/d>\" (whole notes from the start of the bar, e.g. \"1/12\" for triplet positions) or \"tick\": <ticks from the "
+      "start of the bar, 480 per quarter>, \"staff\": <staff number as in score_read's s<N>, {\"number\": N}, or "
+      "{\"part\": \"<part name, any case>\", \"index\": <1-based staff within the part, default 1>}>, \"voice\": <1-4, "
+      "default 1>, \"grace\": <optional 1-based index of a grace chord of that chord, in score order>}. A chord or rest "
+      "must start exactly there (space in a voice is not an event).";
 }
 
 void mu::agent::registerExpressionLinesCommands(CommandRegistry& registry)
@@ -46,9 +48,10 @@ void mu::agent::registerExpressionLinesCommands(CommandRegistry& registry)
               "different bars or systems, different voices, or different staves of the same part (piano RH to LH). "
               "Refused with E_INVALID_ARG: a rest or a trill cue note at either end, both ends on the same chord, "
               "start and end at the same time (e.g. two voices on one beat), ends in different parts, ends on two "
-              "linked staves of one part (a staff and its tablature), a malformed address. Refused with E_RANGE: end "
-              "before start, a bar, beat, staff, part or grace index outside the score, no chord starting at an "
-              "address (the message lists the beats that have events). E_STALE_HANDLE: a handle that no longer names "
+              "linked staves of one part (a staff and its tablature), a malformed address (including a beat below 1 or "
+              "off a tick, and a part name shared by two parts). Refused with E_RANGE: end before start, a bar, beat, "
+              "staff, part or grace index outside the score, no chord or rest starting at an address (the message "
+              "lists the beats that have events). E_STALE_HANDLE: a handle that no longer names "
               "an element. E_EXISTS: a slur already joins these two chords (whatever its direction). "
               "Linked parts get the slur too. Returns the slur's handle and the touched bars in the compact notation, "
               "where the slur shows as ( ... ). Grace-note slurs are added but not shown in the notation.";
@@ -83,8 +86,8 @@ void mu::agent::registerExpressionLinesCommands(CommandRegistry& registry)
               "end-repeat barline separately. An ottava changes the sounding pitch of the notes under it, which "
               "score_read then shows. Overlapping lines are allowed, as in the UI. Refused with E_INVALID_ARG: ends on "
               "different staves, a grace note as an end, an option that does not apply to the kind, a volta address "
-              "with anything but measure (beat, tick, staff, voice, grace), endings that are empty, repeated, or not "
-              "whole numbers 1-100, a malformed address. Refused with E_RANGE: end before start, a bar, beat, staff or "
+              "with anything but measure (beat, offset, tick, staff, voice, grace), endings that are empty, repeated, or "
+              "not whole numbers 1-100, a malformed address (including a beat below 1 or off a tick). Refused with E_RANGE: end before start, a bar, beat, staff or "
               "part outside the score, no event starting at an address. E_STALE_HANDLE: a handle that no longer names "
               "an element. Returns the line's handle and the touched bars "
               "in the compact notation (marks +8va[ ... +8va], +ped[ ... +ped], +trl[ ... +trl], "
