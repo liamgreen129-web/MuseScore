@@ -95,15 +95,15 @@
       "args": {
         "range": {
           "handles": [
-            "Note:not-a-real-handle@m1.s1.v1#62"
+            "garbage"
           ]
         },
         "by": {
           "key": 0
         }
       },
-      "error": "E_",
-      "note": "a bad handle (E_INVALID_ARG or E_STALE_HANDLE); by.key needs a range anyway"
+      "error": "E_INVALID_ARG",
+      "note": "a malformed handle"
     },
     {
       "tool": "transpose",

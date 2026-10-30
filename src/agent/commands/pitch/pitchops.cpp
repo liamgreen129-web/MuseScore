@@ -483,7 +483,7 @@ Ret mu::agent::pitch::setPitch(const Params& p, MasterScore* score, Out& out)
     if (has(p, "tab")) {
         const Val& t = p.at("tab");
         if (t.type() != Val::Type::Map) {
-            return makeErr(Err::InvalidArg, "tab must be {\"string\": S, \"fret\": F} (string 0 = the top line)");
+            return makeErr(Err::InvalidArg, "tab must be {\"string\": S, \"fret\": F} (string 0 = the highest string)");
         }
         const muse::ValMap m = t.toMap();
         for (const auto& [k, _] : m) {
@@ -492,7 +492,7 @@ Ret mu::agent::pitch::setPitch(const Params& p, MasterScore* score, Out& out)
             }
         }
         if (!m.count("string") || !m.count("fret") || !isWhole(m.at("string")) || !isWhole(m.at("fret"))) {
-            return makeErr(Err::InvalidArg, "tab needs whole numbers string (0 = the top line) and fret");
+            return makeErr(Err::InvalidArg, "tab needs whole numbers string (0 = the highest string) and fret");
         }
         wantTab.string = static_cast<int>(m.at("string").toDouble());
         wantTab.fret = static_cast<int>(m.at("fret").toDouble());
@@ -583,7 +583,7 @@ Ret mu::agent::pitch::setPitch(const Params& p, MasterScore* score, Out& out)
             if (hasTab) {
                 if (wantTab.string < 0 || wantTab.string >= static_cast<int>(sd->strings())) {
                     return makeErr(Err::InvalidArg, "tab.string " + std::to_string(wantTab.string) + " is outside 0-"
-                                   + std::to_string(sd->strings() - 1) + " (0 = the top line)");
+                                   + std::to_string(sd->strings() - 1) + " (0 = the highest string)");
                 }
                 if (wantTab.fret < 0 || wantTab.fret > sd->frets()) {
                     return makeErr(Err::InvalidArg, "tab.fret " + std::to_string(wantTab.fret) + " is outside 0-"
@@ -596,6 +596,10 @@ Ret mu::agent::pitch::setPitch(const Params& p, MasterScore* score, Out& out)
                                    + ", not MIDI " + std::to_string(s.pitch));
                 }
                 frets[i] = wantTab;
+            } else if (t->pitch() == s.pitch && t->string() >= 0 && t->string() < static_cast<int>(sd->strings()) && t->fret() >= 0
+                       && sd->getPitch(t->string(), t->fret(), staff, tt) == s.pitch + staff->pitchOffset(tt)) {
+                // same pitch (a respelling or a no-op): keep the fretting the note has
+                frets[i] = { t->string(), t->fret() };
             } else {
                 Fretting f;
                 if (!sd->convertPitch(s.pitch, staff, tt, &f.string, &f.fret)) {
@@ -1422,6 +1426,16 @@ Ret mu::agent::pitch::transpose(const Params& p, MasterScore* score, Out& out)
         }
         extended = true;
         const std::vector<Note*> chain = inner->tiedNotes();
+        // tiedNotes() follows partial ties through repeats and voltas (note.cpp:3865-3909): such a
+        // chain is not one stretch of bars, and widening the range to cover it would also take every
+        // bar in between. Refused; the caller names those bars itself.
+        for (Note* x : chain) {
+            if ((x->tieFor() && x->tieFor()->isPartialTie()) || (x->tieBack() && x->tieBack()->isPartialTie())) {
+                return makeErr(Err::InvalidArg, "ties extend: the tie chain of " + describe(score, inner)
+                               + " runs through a repeat or volta (partial ties), so it is not one stretch of bars; "
+                                 "transpose those bars or notes explicitly");
+            }
+        }
         if (t.list) {
             for (Note* x : chain) {
                 if (std::find(t.items.begin(), t.items.end(), x) == t.items.end()) {
@@ -1627,13 +1641,30 @@ Ret mu::agent::pitch::transpose(const Params& p, MasterScore* score, Out& out)
     }
 
     // ---- post-conditions
+    // Pitch and tpc1 are checked exactly against the prediction. tpc2 is not predictable before the
+    // call in chromatic modes: a key change in the range makes undoChangeKeySig run
+    // Transpose::transpositionChanged (edit.cpp:6078-6084, transpose.cpp:403-472), which respells
+    // tpc2 from tpc1 with the staff's new, possibly enharmonically adjusted, transposition
+    // (Staff::transpose, staff.cpp:861-891). So tpc2 must be what either writer derives from the
+    // live staff: Note::transpose's (note.cpp:4246-4253, double accidentals as asked) or
+    // transpositionChanged's (always allowing double accidentals).
+    auto tpc2Ok = [dbl](const Note* ln) {
+        if (!ln->transposition()) {
+            return ln->tpc2() == ln->tpc1();
+        }
+        Interval v = ln->staff()->transpose(ln->tick());
+        v.flip();
+        return ln->tpc2() == Transpose::transposeTpc(ln->tpc1(), v, dbl) || ln->tpc2() == Transpose::transposeTpc(ln->tpc1(), v, true);
+    };
+    const bool diatonic = by.mode == TransposeMode::DIATONICALLY;
     for (const auto& [n, st] : expect) {
         for (EngravingObject* e : n->linkList()) {
             const Note* ln = toNote(e);
-            if (ln->pitch() != st.pitch || ln->tpc1() != st.tpc1 || ln->tpc2() != st.tpc2) {
+            const bool ok = ln->pitch() == st.pitch && ln->tpc1() == st.tpc1 && (diatonic ? ln->tpc2() == st.tpc2 : tpc2Ok(ln));
+            if (!ok) {
                 return makeErr(Err::PostCondition, describe(score, n) + ": a copy holds MIDI " + std::to_string(ln->pitch()) + " "
                                + spellingOf(ln->tpc1()) + "/" + spellingOf(ln->tpc2()) + ", expected " + std::to_string(st.pitch) + " "
-                               + spellingOf(st.tpc1) + "/" + spellingOf(st.tpc2));
+                               + spellingOf(st.tpc1) + (diatonic ? "/" + spellingOf(st.tpc2) : std::string(" and the staff's written spelling")));
             }
         }
     }

@@ -26,11 +26,10 @@ using namespace mu::agent;
 using muse::Val;
 namespace pt = mu::agent::pitch;
 
-//! Every argument has one JSON type: the registry's Arg has a single DataType, and
-//! DataType::Undefined is rendered as "type": "undefined" in tools/list (server/mcptypes.h:43),
-//! which is not valid JSON Schema. So the spec's oneOf arguments are split: target (handle) or
-//! staff + at; pitch (spelled) or midi (number); note (pitch) or note_index; range is always an
-//! object ({score: true} for the whole score).
+//! The registry's Arg has one DataType, so the spec's oneOf arguments are split: target (handle)
+//! or staff + at; pitch (spelled) or midi (number); note (pitch) or note_index; range is always an
+//! object ({score: true} for the whole score). staff is DataType::Undefined (a number or an
+//! object; tools/list leaves its "type" out), resolved by address::resolveStaff.
 namespace {
 Arg arg(DataType t, const std::string& d, bool required = false)
 {
@@ -66,8 +65,8 @@ std::string joined(const std::vector<std::string>& v)
 }
 
 const char* STAFF_DESC
-    = "The staff: {\"part\": \"<part name as in score_overview>\", \"index\": <staff in the part, 1-based, default 1>} "
-      "or {\"number\": <staff in the score, 1-based, as # sN in score_read>}";
+    = "The staff: its number in the score (1-based, as # sN in score_read, e.g. 3), {\"number\": 3}, or "
+      "{\"part\": \"<part name as in score_overview>\", \"index\": <staff in the part, 1-based, default 1>}";
 const char* POSITION_DESC
     = "{\"measure\": <bar by position, as m<N> in score_read; a pickup is 1>, \"beat\": <1-based, in quarter notes>} or "
       "{\"measure\", \"offset\": \"<n>/<d>\" (whole notes from the start of the bar)}";
@@ -91,7 +90,7 @@ void mu::agent::registerPitchCommands(CommandRegistry& registry)
               "kept (\"F#4\", \"Bbb3\"; C4 = middle C; accidentals #, ##, b, bb), or midi, a number spelled by spelling "
               "(auto = nearest in the key, the default; sharps; flats). space: sounding (default; what score_read prints, "
               "transposition and any 8va included) or written. On a TAB staff the note is refretted on the highest string "
-              "that plays it, or on tab {string, fret} (string 0 = the top line). On a drum staff give midi, the drum "
+              "that plays it, or on tab {string, fret} (string 0 = the highest string). On a drum staff give midi, the drum "
               "sound. Refuses (E_INVALID_ARG): target with staff/at; a rest; a chord of several notes without note or "
               "note_index, or no such tone; both or neither of pitch and midi; a pitch that is not spelled as above or "
               "outside MIDI 0-127, or that would be stored outside 0-127; spelling with pitch; a spelling that would need "
@@ -104,7 +103,7 @@ void mu::agent::registerPitchCommands(CommandRegistry& registry)
         c.kind = CommandKind::Write;
         c.undoName = "Set pitch";
         c.input["target"] = arg(DataType::String, "A Note or Chord handle from score_read detail (instead of staff + at)");
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC); // a number or an object (address.h)
         c.input["at"] = arg(DataType::Object, std::string("Where the note starts: ") + POSITION_DESC);
         c.input["voice"] = intArg("Voice 1-4 (default 1)", 1, 4);
         c.input["note"] = arg(DataType::String, "In a chord: the tone to change, by its current pitch (\"E4\")");
@@ -116,13 +115,13 @@ void mu::agent::registerPitchCommands(CommandRegistry& registry)
                                    { "sounding", "written" });
         c.input["spelling"] = enumArg("With midi only: auto (default, nearest in the key), sharps or flats",
                                       { "auto", "sharps", "flats" });
-        c.input["tab"] = arg(DataType::Object, "TAB staves only: {\"string\": S (0 = the top line), \"fret\": F}");
+        c.input["tab"] = arg(DataType::Object, "TAB staves only: {\"string\": S (0 = the highest string), \"fret\": F}");
         c.output["handle"] = arg(DataType::String, "The note's handle after the edit (the fingerprint holds the pitch)");
         c.output["status"] = arg(DataType::String, "changed, or unchanged when it already had that pitch and spelling");
         c.output["pitch"] = arg(DataType::String, "Its sounding pitch, as score_read prints it");
         c.output["writtenPitch"] = arg(DataType::String, "Its written pitch");
         c.output["tiedNotes"] = arg(DataType::Integer, "Notes in its tie chain, itself included, that now have this pitch");
-        c.output["string"] = arg(DataType::Integer, "TAB staves: the string (0 = the top line)");
+        c.output["string"] = arg(DataType::Integer, "TAB staves: the string (0 = the highest string)");
         c.output["fret"] = arg(DataType::Integer, "TAB staves: the fret");
         c.output["bars"] = arg(DataType::String, "The bars the tie chain covers, e.g. m3-m5");
         c.output["notation"] = arg(DataType::String, NOTATION_DESC);
@@ -138,7 +137,7 @@ void mu::agent::registerPitchCommands(CommandRegistry& registry)
             = "Transposes notes, and optionally key signatures and chord symbols, as Tools > Transpose does. range: "
               "{score: true, staves?} for the whole score; {start, end, staves?} where start and end are {measure, "
               "beat|offset}, end inclusive (the note or rest starting there is transposed; give only end.measure for the "
-              "whole bar); staves lists staves ({\"number\": 3} or {\"part\": \"Flute\", \"index\": 1}; default all); or "
+              "whole bar); staves lists staves (3, {\"number\": 3} or {\"part\": \"Flute\", \"index\": 1}; default all); or "
               "{handles: [...]} with Note, Chord, chord-symbol or fret-diagram handles. by: {interval: one of "
             + joined(pt::intervalNames())
             + ", direction: up|down, octaves: 0-3 (compound intervals: a ninth is M2 + 1 octave)}; {key: -7..7 (the "

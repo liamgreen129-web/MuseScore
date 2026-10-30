@@ -23,6 +23,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -33,6 +34,9 @@
 
 #include "engraving/dom/chord.h"
 #include "engraving/dom/drumset.h"
+#include "engraving/dom/excerpt.h"
+#include "engraving/dom/factory.h"
+#include "engraving/dom/fret.h"
 #include "engraving/dom/guitarbend.h"
 #include "engraving/dom/harmony.h"
 #include "engraving/dom/instrument.h"
@@ -52,6 +56,7 @@
 #include "engraving/dom/stafftype.h"
 #include "engraving/dom/stringdata.h"
 #include "engraving/dom/tie.h"
+#include "engraving/editing/transpose.h"
 #include "engraving/editing/undo.h"
 #include "engraving/tests/utils/scorerw.h"
 
@@ -756,10 +761,12 @@ TEST_F(Agent_Pitch, SetPitchGuitarBendIsRefused)
     score->startCmd(muse::TranslatableString::untranslatable("test: bend"));
     GuitarBend* bend = score->addGuitarBend(GuitarBendType::BEND, n);
     score->endCmd();
-    if (!bend || !n->bendFor()) {
-        GTEST_SKIP() << "addGuitarBend made no bend on this staff";
-    }
+    ASSERT_TRUE(bend) << "addGuitarBend(BEND) made no bend from m1 beat 1";
+    ASSERT_TRUE(n->bendFor());
+    Note* end = toNote(bend->endElement());
+    ASSERT_TRUE(end && end->bendBack());
     refused(SET, setArgs(where(1, 1, 1), Val("D5")), AErr::InvalidArg, "guitar bend");
+    refused(SET, setArgs(Val(makeHandle(end)), Val("F5")), AErr::InvalidArg, "guitar bend");
 }
 
 TEST_F(Agent_Pitch, SetPitchTabOnStandardStaffIsRefused)
@@ -795,6 +802,18 @@ TEST_F(Agent_Pitch, SetPitchOnTabStaff)
     tab["string"] = Val(1);
     tab["fret"] = Val(10);
     ASSERT_TRUE(run(SET, with(setArgs(Val(outStr("handle")), Val("A4")), "tab", Val(tab))));
+    EXPECT_EQ(n->string(), 1);
+    EXPECT_EQ(n->fret(), 10);
+
+    // the same pitch without tab keeps the note's fretting (not convertPitch's string 0 fret 5):
+    // unchanged, and a respelling stays on string 1 fret 10 too
+    ASSERT_TRUE(run(SET, setArgs(Val(outStr("handle")), Val("A4"))));
+    EXPECT_EQ(outStr("status"), "unchanged");
+    EXPECT_FALSE(changed);
+    EXPECT_EQ(n->string(), 1);
+    EXPECT_EQ(n->fret(), 10);
+    ASSERT_TRUE(run(SET, setArgs(Val(outStr("handle")), Val("Bbb4"))));
+    EXPECT_EQ(n->tpc1(), Tpc::TPC_B_BB);
     EXPECT_EQ(n->string(), 1);
     EXPECT_EQ(n->fret(), 10);
 
@@ -1255,4 +1274,188 @@ TEST_F(Agent_Pitch, TransposeNothingPitched)
     Params p = trArgs(rangeOf(pos(1, 1), pos(1, 1), { 2 }), interval("M2", "up"));
     p["key_signatures"] = Val(false);
     refused(TR, p, AErr::InvalidArg, "nothing to transpose");
+}
+
+// ================================================================== review additions
+
+namespace {
+struct NoteBefore {
+    Note* note = nullptr;
+    int pitch = 0;
+    int tpc1 = 0;
+};
+
+std::vector<NoteBefore> allNotes(MasterScore* score)
+{
+    std::vector<NoteBefore> v;
+    for (Segment* s = score->firstSegment(SegmentType::ChordRest); s; s = s->next1(SegmentType::ChordRest)) {
+        for (track_idx_t t = 0; t < score->ntracks(); ++t) {
+            EngravingItem* e = s->element(t);
+            if (e && e->isChord()) {
+                for (Note* n : toChord(e)->notes()) {
+                    v.push_back({ n, n->pitch(), n->tpc1() });
+                }
+            }
+        }
+    }
+    return v;
+}
+}
+
+//! Keys with many accidentals: Staff::transpose respells the written key of a transposing staff
+//! (staff.cpp:861-891) and undoChangeKeySig respells tpc2 through transpositionChanged
+//! (edit.cpp:6078-6084). The post-condition must accept that written spelling.
+TEST_F(Agent_Pitch, TransposeToFarKeysOnTransposingInstruments)
+{
+    struct Case {
+        int key;
+        Interval interval;
+    };
+    for (const Case& c : { Case { 4, Interval(2, 4) }, Case { 5, Interval(-1, -1) } }) {
+        open("transposing-instruments.mscz");
+        const std::vector<NoteBefore> before = allNotes(score.get());
+        ASSERT_FALSE(before.empty());
+        const Ret r = run(TR, trArgs(scoreRange(), toKey(c.key)));
+        ASSERT_TRUE(r) << "key " << c.key << ": " << r.text();
+        for (staff_idx_t s = 0; s < score->nstaves(); ++s) {
+            EXPECT_EQ(int(score->staff(s)->concertKey(Fraction(0, 1))), c.key) << "staff " << s + 1;
+        }
+        for (const NoteBefore& b : before) {
+            Note* n = b.note;
+            EXPECT_EQ(n->pitch(), b.pitch + c.interval.chromatic);
+            EXPECT_EQ(n->tpc1(), Transpose::transposeTpc(b.tpc1, c.interval, true));
+            // the written spelling names the written pitch, with at most a double accidental
+            const int written = n->pitch() - n->staff()->transpose(n->tick()).chromatic;
+            EXPECT_EQ(((tpc2pitch(n->tpc2()) - written) % 12 + 12) % 12, 0) << "staff " << n->staffIdx() + 1;
+            EXPECT_LE(std::abs(static_cast<int>(tpc2alter(n->tpc2()))), 2);
+        }
+        // the Eb alto sax (staff 4) reads in another key than the concert one
+        EXPECT_NE(int(score->staff(3)->key(Fraction(0, 1))), c.key);
+        score->undoRedo(true, nullptr);
+        for (const NoteBefore& b : before) {
+            EXPECT_EQ(b.note->pitch(), b.pitch);
+            EXPECT_EQ(b.note->tpc1(), b.tpc1);
+        }
+    }
+}
+
+TEST_F(Agent_Pitch, TransposeKeyChangeInsideTheRange)
+{
+    open("key-time-changes.mscz");
+    // bar 3 changes to G major; bar 6 to Eb major
+    const Fraction t1 = bar(score.get(), 1)->tick();
+    const Fraction t3 = bar(score.get(), 3)->tick();
+    const Fraction t6 = bar(score.get(), 6)->tick();
+    ASSERT_EQ(int(score->staff(0)->concertKey(t3)), 1);
+    ASSERT_EQ(int(score->staff(0)->concertKey(t6)), -3);
+    addsOneEntry(TR, trArgs(rangeOf(pos(2), pos(4)), interval("M2", "up")), [&] {
+        for (staff_idx_t s = 0; s < 2; ++s) {
+            EXPECT_EQ(int(score->staff(s)->concertKey(t3)), 3) << "G -> A at bar 3, staff " << s + 1;
+            EXPECT_EQ(int(score->staff(s)->concertKey(t1)), 0) << "bar 1 is outside the range";
+            EXPECT_EQ(int(score->staff(s)->concertKey(t6)), -3) << "the key change at bar 6 is outside the range";
+        }
+        EXPECT_EQ(noteAt(score.get(), 1, 3, 1)->pitch(), 71);
+        EXPECT_EQ(noteAt(score.get(), 1, 5, 1)->pitch(), 64) << "bar 5 untouched";
+    }, [&] {
+        EXPECT_EQ(int(score->staff(0)->concertKey(t3)), 1);
+        EXPECT_EQ(noteAt(score.get(), 1, 3, 1)->pitch(), 69);
+    });
+    EXPECT_GE(outInt("keySignatures"), 2);
+}
+
+TEST_F(Agent_Pitch, LinkedTabStaffIsRefretted)
+{
+    open("ties-barlines.mscz");
+    // test set-up only: a guitar with a TAB staff linked to its standard staff ("Add linked staff",
+    // as expression_lines_tests.cpp does); the set-up command's layout frets the TAB notes
+    Staff* original = score->staff(0);
+    int strings[6] = { 40, 45, 50, 55, 59, 64 };
+    original->part()->instrument()->setStringData(StringData(24, 6, strings));
+    score->startCmd(muse::TranslatableString::untranslatable("test: linked TAB staff"));
+    Staff* tabStaff = Factory::createStaff(original->part());
+    tabStaff->setPart(original->part());
+    score->undoInsertStaff(tabStaff, 1, false);
+    Excerpt::cloneStaff(original, tabStaff);
+    tabStaff->setStaffType(Fraction(0, 1), *StaffType::preset(StaffTypes::TAB_6COMMON));
+    score->endCmd();
+    ASSERT_EQ(score->nstaves(), 2u);
+    ASSERT_TRUE(tabStaff->isTabStaff(Fraction(0, 1)));
+    Note* tabNote = noteAt(score.get(), 2, 1, 1);
+    ASSERT_TRUE(tabNote);
+    auto fretted = [&](int pitch) {
+        EXPECT_EQ(tabNote->pitch(), pitch);
+        const Fraction tick = tabNote->chord()->tick();
+        const StringData* sd = tabStaff->part()->stringData(tick, tabStaff->idx());
+        ASSERT_TRUE(sd);
+        EXPECT_EQ(sd->getPitch(tabNote->string(), tabNote->fret(), tabStaff, tick), pitch)
+            << "string " << tabNote->string() << " fret " << tabNote->fret();
+        EXPECT_FALSE(tabNote->fretConflict());
+    };
+    fretted(72);
+    addsOneEntry(SET, setArgs(where(1, 1, 1), Val("A4")), [&] { fretted(69); }, [&] { fretted(72); });
+    addsOneEntry(TR, trArgs(rangeOf(pos(1, 1), pos(1, 1), { 1 }), interval("M2", "up")), [&] { fretted(71); },
+                 [&] { fretted(69); });
+}
+
+TEST_F(Agent_Pitch, FretDiagramWithUnknownShapeLeavesNoStrayChordSymbol)
+{
+    open("ties-barlines.mscz");
+    // test set-up only: an E major fret diagram with no chord symbol on bar 1. Up an augmented
+    // unison it would be E#, which harmony_to_diagram.xml has no shape for: the engine's
+    // no-chord-symbol branch then returns with its temporary Harmony attached (transpose.cpp:626-629)
+    Segment* seg = bar(score.get(), 1)->first(SegmentType::ChordRest);
+    ASSERT_TRUE(seg);
+    score->startCmd(muse::TranslatableString::untranslatable("test: fret diagram"));
+    FretDiagram* fd = Factory::createFretDiagram(seg);
+    fd->setTrack(0);
+    fd->setParent(seg);
+    fd->updateDiagram(u"E");
+    score->undoAddElement(fd);
+    score->endCmd();
+    ASSERT_FALSE(fd->isClear()) << "the E shape was found";
+    ASSERT_FALSE(fd->harmony());
+    ASSERT_TRUE(fd->patternsFromHarmony(u"E#").empty()) << "the premise: no E# shape";
+    const muse::String shape = fd->patternFromDiagram();
+
+    Params p = trArgs(rangeOf(pos(1), pos(1), { 1 }), interval("A1", "up"));
+    p["key_signatures"] = Val(false);
+    Transaction tx(score.get(), *backend);
+    ASSERT_TRUE(tx.begin("Agent: test"));
+    const Ret r = tx.step("op", [&] { return TR(p, score.get(), out); });
+    ASSERT_TRUE(r) << r.text();
+    bool warned = false;
+    for (const std::string& w : tx.warnings()) {
+        warned = warned || w.find("TRANSPOSE_NO_FRET_DIAGRAM") != std::string::npos;
+    }
+    EXPECT_TRUE(warned) << "the unknown shape is reported as a warning";
+    EXPECT_FALSE(fd->harmony()) << "the engine's temporary chord symbol was taken off";
+    tx.rollback();
+    EXPECT_FALSE(fd->harmony()) << "no stray chord symbol after rollback";
+    EXPECT_EQ(fd->patternFromDiagram(), shape) << "rollback restores the diagram";
+    EXPECT_EQ(noteAt(score.get(), 1, 1, 1)->pitch(), 72);
+}
+
+TEST_F(Agent_Pitch, TieExtendThroughARepeatIsRefused)
+{
+    // an upstream fixture with partial ties into voltas and a coda (partialtie_tests.cpp)
+    const fs::path f = fs::path(agent_tests_DATA_ROOT) / "../../engraving/tests/partialtie_data/volta_coda-ref.mscx";
+    score.reset(ScoreRW::readScore(muse::String::fromStdString(f.string()), true));
+    ASSERT_TRUE(score);
+    backend = std::make_unique<ScoreUndoBackend>(score.get());
+    Note* member = nullptr;
+    for (const NoteBefore& b : allNotes(score.get())) {
+        const std::vector<Note*> chain = b.note->tiedNotes();
+        bool partial = false;
+        for (Note* x : chain) {
+            partial = partial || (x->tieFor() && x->tieFor()->isPartialTie()) || (x->tieBack() && x->tieBack()->isPartialTie());
+        }
+        if (partial && chain.size() > 1) {
+            member = b.note;
+            break;
+        }
+    }
+    ASSERT_TRUE(member) << "the fixture has a tie chain through a jump";
+    const Params p = trArgs(handles({ makeHandle(member) }), interval("M2", "up"));
+    refused(TR, p, AErr::InvalidArg, "is tied to");
+    refused(TR, with(p, "ties", Val("extend")), AErr::InvalidArg, "partial ties");
 }
