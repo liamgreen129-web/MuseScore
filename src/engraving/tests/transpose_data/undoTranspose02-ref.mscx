@@ -68,10 +68,6 @@
             <isHeader>1</isHeader>
             <eid>F_F</eid>
             </Clef>
-          <KeySig>
-            <eid>G_G</eid>
-            <concertKey>0</concertKey>
-            </KeySig>
           <TimeSig>
             <eid>H_H</eid>
             <sigN>4</sigN>
@@ -408,10 +404,6 @@
             <isHeader>1</isHeader>
             <eid>LB_LB</eid>
             </Clef>
-          <KeySig>
-            <eid>MB_MB</eid>
-            <concertKey>0</concertKey>
-            </KeySig>
           <TimeSig>
             <eid>NB_NB</eid>
             <sigN>4</sigN>
