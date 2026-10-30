@@ -1151,6 +1151,14 @@ TEST_F(Agent_Pitch, TransposeByErrors)
 
 TEST_F(Agent_Pitch, TransposeListErrors)
 {
+    {
+        // a handle that went stale (its note changed pitch) is E_STALE_HANDLE, nothing transposed
+        Note* n = noteAt(score.get(), 1, 1, 1);
+        ASSERT_TRUE(n);
+        const Val stale = handles({ makeHandle(n) });
+        ASSERT_TRUE(run(SET, setArgs(Val(makeHandle(n)), Val(n->pitch() == 72 ? "D5" : "C5"))));
+        refused(TR, trArgs(stale, interval("M2", "up")), AErr::StaleHandle);
+    }
     const Val list = handles({ makeHandle(noteAt(score.get(), 1, 1, 1)) });
     refused(TR, trArgs(list, toKey(2)), AErr::InvalidArg, "needs a range");
     refused(TR, with(trArgs(list, interval("M2", "up")), "key_signatures", Val(true)), AErr::InvalidArg, "needs a range");
@@ -1283,6 +1291,7 @@ struct NoteBefore {
     Note* note = nullptr;
     int pitch = 0;
     int tpc1 = 0;
+    int tpc2 = 0;
 };
 
 std::vector<NoteBefore> allNotes(MasterScore* score)
@@ -1293,7 +1302,7 @@ std::vector<NoteBefore> allNotes(MasterScore* score)
             EngravingItem* e = s->element(t);
             if (e && e->isChord()) {
                 for (Note* n : toChord(e)->notes()) {
-                    v.push_back({ n, n->pitch(), n->tpc1() });
+                    v.push_back({ n, n->pitch(), n->tpc1(), n->tpc2() });
                 }
             }
         }
@@ -1315,6 +1324,10 @@ TEST_F(Agent_Pitch, TransposeToFarKeysOnTransposingInstruments)
         open("transposing-instruments.mscz");
         const std::vector<NoteBefore> before = allNotes(score.get());
         ASSERT_FALSE(before.empty());
+        std::vector<int> keysBefore;
+        for (staff_idx_t s = 0; s < score->nstaves(); ++s) {
+            keysBefore.push_back(int(score->staff(s)->concertKey(Fraction(0, 1))));
+        }
         const Ret r = run(TR, trArgs(scoreRange(), toKey(c.key)));
         ASSERT_TRUE(r) << "key " << c.key << ": " << r.text();
         for (staff_idx_t s = 0; s < score->nstaves(); ++s) {
@@ -1335,6 +1348,10 @@ TEST_F(Agent_Pitch, TransposeToFarKeysOnTransposingInstruments)
         for (const NoteBefore& b : before) {
             EXPECT_EQ(b.note->pitch(), b.pitch);
             EXPECT_EQ(b.note->tpc1(), b.tpc1);
+            EXPECT_EQ(b.note->tpc2(), b.tpc2) << "the written spelling comes back too";
+        }
+        for (staff_idx_t s = 0; s < score->nstaves(); ++s) {
+            EXPECT_EQ(int(score->staff(s)->concertKey(Fraction(0, 1))), keysBefore[s]) << "staff " << s + 1;
         }
     }
 }

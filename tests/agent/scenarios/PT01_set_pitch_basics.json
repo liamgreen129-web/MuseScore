@@ -78,9 +78,7 @@
       "tool": "set_pitch",
       "writes": true,
       "args": {
-        "staff": {
-          "number": 1
-        },
+        "staff": 1,
         "at": {
           "measure": 1,
           "beat": 2
@@ -90,7 +88,8 @@
       },
       "expect": {
         "pitch": "Ab4"
-      }
+      },
+      "note": "a bare staff number (the shared address shape) passes the registry"
     },
     {
       "tool": "score_read",
@@ -235,6 +234,34 @@
       },
       "error": "E_INVALID_ARG",
       "note": "tab on a standard staff"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": 1,
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "voice": 5,
+        "pitch": "E4"
+      },
+      "error": "E_RANGE",
+      "note": "a voice outside 1-4 is E_RANGE from the command (no schema limit)"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": 1,
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "note_index": 40,
+        "pitch": "E4"
+      },
+      "error": "E_RANGE",
+      "note": "note_index past the chord's notes (no schema maximum)"
     }
   ],
   "goldens": [

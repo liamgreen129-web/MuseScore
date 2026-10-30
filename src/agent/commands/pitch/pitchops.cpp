@@ -1430,7 +1430,14 @@ Ret mu::agent::pitch::transpose(const Params& p, MasterScore* score, Out& out)
         // chain is not one stretch of bars, and widening the range to cover it would also take every
         // bar in between. Refused; the caller names those bars itself.
         for (Note* x : chain) {
-            if ((x->tieFor() && x->tieFor()->isPartialTie()) || (x->tieBack() && x->tieBack()->isPartialTie())) {
+            // also a full tie whose jump points lead elsewhere (around a segno, note.cpp:3872-3884)
+            bool jumps = false;
+            if (x->tieFor() && x->tieFor()->tieJumpPoints()) {
+                for (const TieJumpPoint* jp : *x->tieFor()->tieJumpPoints()) {
+                    jumps = jumps || jp->active();
+                }
+            }
+            if (jumps || (x->tieFor() && x->tieFor()->isPartialTie()) || (x->tieBack() && x->tieBack()->isPartialTie())) {
                 return makeErr(Err::InvalidArg, "ties extend: the tie chain of " + describe(score, inner)
                                + " runs through a repeat or volta (partial ties), so it is not one stretch of bars; "
                                  "transpose those bars or notes explicitly");
@@ -1647,20 +1654,45 @@ Ret mu::agent::pitch::transpose(const Params& p, MasterScore* score, Out& out)
     // tpc2 from tpc1 with the staff's new, possibly enharmonically adjusted, transposition
     // (Staff::transpose, staff.cpp:861-891). So tpc2 must be what either writer derives from the
     // live staff: Note::transpose's (note.cpp:4246-4253, double accidentals as asked) or
-    // transpositionChanged's (always allowing double accidentals).
-    auto tpc2Ok = [dbl](const Note* ln) {
+    // transpositionChanged's (always allowing double accidentals). Within one engine call
+    // Note::transpose writes last (a key signature is changed before the chords at or after its
+    // tick, transpose.cpp:198-252), so transpositionChanged's spelling survives only when a later
+    // call changes a key in the note's part: only then is the second form accepted.
+    auto laterKeyChangeInPart = [&](const Note* master) {
+        if (dbl || t.list || keyExpect.empty()) {
+            return false; // with double accidentals both forms are the same
+        }
+        const staff_idx_t si = master->staffIdx();
+        size_t mine = t.blocks.size();
+        for (size_t i = 0; i < t.blocks.size(); ++i) {
+            if (si >= t.blocks[i].first && si < t.blocks[i].second) {
+                mine = i;
+            }
+        }
+        for (size_t j = mine + 1; j < t.blocks.size(); ++j) {
+            for (const Staff* ps : master->part()->staves()) {
+                if (ps->idx() >= t.blocks[j].first && ps->idx() < t.blocks[j].second) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+    auto tpc2Ok = [dbl](const Note* ln, bool alsoTranspositionChanged) {
         if (!ln->transposition()) {
             return ln->tpc2() == ln->tpc1();
         }
         Interval v = ln->staff()->transpose(ln->tick());
         v.flip();
-        return ln->tpc2() == Transpose::transposeTpc(ln->tpc1(), v, dbl) || ln->tpc2() == Transpose::transposeTpc(ln->tpc1(), v, true);
+        return ln->tpc2() == Transpose::transposeTpc(ln->tpc1(), v, dbl)
+               || (alsoTranspositionChanged && ln->tpc2() == Transpose::transposeTpc(ln->tpc1(), v, true));
     };
     const bool diatonic = by.mode == TransposeMode::DIATONICALLY;
     for (const auto& [n, st] : expect) {
+        const bool later = laterKeyChangeInPart(n);
         for (EngravingObject* e : n->linkList()) {
             const Note* ln = toNote(e);
-            const bool ok = ln->pitch() == st.pitch && ln->tpc1() == st.tpc1 && (diatonic ? ln->tpc2() == st.tpc2 : tpc2Ok(ln));
+            const bool ok = ln->pitch() == st.pitch && ln->tpc1() == st.tpc1 && (diatonic ? ln->tpc2() == st.tpc2 : tpc2Ok(ln, later));
             if (!ok) {
                 return makeErr(Err::PostCondition, describe(score, n) + ": a copy holds MIDI " + std::to_string(ln->pitch()) + " "
                                + spellingOf(ln->tpc1()) + "/" + spellingOf(ln->tpc2()) + ", expected " + std::to_string(st.pitch) + " "

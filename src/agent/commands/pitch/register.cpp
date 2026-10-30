@@ -90,7 +90,7 @@ void mu::agent::registerPitchCommands(CommandRegistry& registry)
               "kept (\"F#4\", \"Bbb3\"; C4 = middle C; accidentals #, ##, b, bb), or midi, a number spelled by spelling "
               "(auto = nearest in the key, the default; sharps; flats). space: sounding (default; what score_read prints, "
               "transposition and any 8va included) or written. On a TAB staff the note is refretted on the highest string "
-              "that plays it, or on tab {string, fret} (string 0 = the highest string). On a drum staff give midi, the drum "
+              "that plays it (a same-pitch edit keeps its fretting), or on tab {string, fret} (string 0 = the highest string). On a drum staff give midi, the drum "
               "sound. Refuses (E_INVALID_ARG): target with staff/at; a rest; a chord of several notes without note or "
               "note_index, or no such tone; both or neither of pitch and midi; a pitch that is not spelled as above or "
               "outside MIDI 0-127, or that would be stored outside 0-127; spelling with pitch; a spelling that would need "
@@ -105,10 +105,11 @@ void mu::agent::registerPitchCommands(CommandRegistry& registry)
         c.input["target"] = arg(DataType::String, "A Note or Chord handle from score_read detail (instead of staff + at)");
         c.input["staff"] = arg(DataType::Undefined, STAFF_DESC); // a number or an object (address.h)
         c.input["at"] = arg(DataType::Object, std::string("Where the note starts: ") + POSITION_DESC);
-        c.input["voice"] = intArg("Voice 1-4 (default 1)", 1, 4);
+        c.input["voice"] = arg(DataType::Integer, "Voice 1-4 (default 1)"); // no schema limit: outside 1-4 is E_RANGE
         c.input["note"] = arg(DataType::String, "In a chord: the tone to change, by its current pitch (\"E4\")");
-        c.input["note_index"] = intArg("In a chord: the tone to change, 1 = the lowest", 1, 32);
-        c.input["grace"] = intArg("A grace note before the note: 1 = the first", 1, 32);
+        // no schema max: past the chord's notes or graces is E_RANGE from the command
+        c.input["note_index"] = arg(DataType::Integer, "In a chord: the tone to change, 1 = the lowest");
+        c.input["grace"] = arg(DataType::Integer, "A grace note before the note: 1 = the first");
         c.input["pitch"] = arg(DataType::String, "The new pitch, spelled: \"F#4\", \"Bbb3\" (C4 = middle C)");
         c.input["midi"] = intArg("The new pitch as a MIDI number (60 = middle C), spelled by spelling", 0, 127);
         c.input["space"] = enumArg("sounding (default, as score_read prints) or written (as the player reads it)",
@@ -151,7 +152,8 @@ void mu::agent::registerPitchCommands(CommandRegistry& registry)
               "refused unless ties is extend, which widens the range over the whole tie chain. Refuses (E_INVALID_ARG): "
               "a malformed range or by, an interval not in the list, a P1 with no octaves, by.key or key_signatures with "
               "handles, key_signatures with degrees, end before start, a note that would leave MIDI 0-127 (diatonic too, "
-              "where MuseScore would wrap it by octaves), a tie leaving the range, chord-symbol handles with "
+              "where MuseScore would wrap it by octaves), a tie leaving the range, ties extend over a tie chain that runs "
+              "through a repeat or volta (partial ties or jump points), chord-symbol handles with "
               "chord_symbols false, nothing pitched to transpose (only percussion, only rests). E_RANGE: a bar or staff "
               "outside the score, or a start/end where no note or rest starts on those staves. E_STALE_HANDLE: a handle "
               "that no longer resolves. To the key already in force with direction closest it changes nothing (status "
