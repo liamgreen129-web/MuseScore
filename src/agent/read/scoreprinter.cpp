@@ -207,6 +207,42 @@ struct SpannerMarks {
     std::map<const ChordRest*, int> slurClose;
 };
 
+//! The chord/rest a line starts on when it has none of its own: a system line (system flag) is
+//! anchored to a Segment (Spanner::doComputeStartElement, spanner.cpp:741), so startCR() is null.
+//! Prefers the line's own voice, then any voice of its staff, starting at tick; else the event
+//! sounding at tick on that staff.
+const ChordRest* chordRestAtTickInStaff(const Score* score, const Fraction& tick, track_idx_t lineTrack)
+{
+    const staff_idx_t si = track2staff(lineTrack);
+    const track_idx_t strack = si * VOICES;
+    if (const Segment* seg = score->tick2segment(tick, true, SegmentType::ChordRest)) {
+        if (const EngravingItem* e = seg->element(lineTrack); e && e->isChordRest()) {
+            return toChordRest(e);
+        }
+        for (track_idx_t t = strack; t < strack + VOICES; ++t) {
+            if (const EngravingItem* e = seg->element(t); e && e->isChordRest()) {
+                return toChordRest(e);
+            }
+        }
+    }
+    const Measure* m = score->tick2measure(tick);
+    if (!m) {
+        return nullptr;
+    }
+    for (const Segment* seg = m->first(SegmentType::ChordRest); seg; seg = seg->next(SegmentType::ChordRest)) {
+        for (track_idx_t t = strack; t < strack + VOICES; ++t) {
+            const EngravingItem* e = seg->element(t);
+            if (e && e->isChordRest()) {
+                const ChordRest* cr = toChordRest(e);
+                if (cr->tick() <= tick && tick < cr->tick() + cr->actualTicks()) {
+                    return cr;
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+
 SpannerMarks collectSpanners(const Score* score)
 {
     SpannerMarks out;
@@ -215,6 +251,9 @@ SpannerMarks collectSpanners(const Score* score)
         const EngravingItem* se = s->startElement();
         const EngravingItem* ee = s->endElement();
         const ChordRest* scr = (se && se->isChordRest()) ? toChordRest(se) : s->startCR();
+        if (!scr && !s->isSlur() && s->anchor() == Spanner::Anchor::SEGMENT) {
+            scr = chordRestAtTickInStaff(score, s->tick(), s->track());
+        }
         const ChordRest* ecr = (ee && ee->isChordRest()) ? toChordRest(ee) : s->endCR();
         if (!s->isSlur()) {
             // NOTATION.md: an end mark goes on the last event the line covers. A line's endElement
