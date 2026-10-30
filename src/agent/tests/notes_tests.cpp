@@ -28,12 +28,19 @@
 #include <memory>
 #include <sstream>
 
+#include "engraving/dom/accidental.h"
 #include "engraving/dom/chord.h"
 #include "engraving/dom/excerpt.h"
+#include "engraving/dom/instrument.h"
+#include "engraving/dom/part.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
+#include "engraving/dom/note.h"
+#include "engraving/dom/staff.h"
+#include "engraving/dom/stafftype.h"
 #include "engraving/dom/mscore.h"
 #include "engraving/editing/undo.h"
+#include "engraving/types/constants.h"
 #include "engraving/tests/utils/scorerw.h"
 
 #include "address/address.h"
@@ -789,7 +796,7 @@ Params xv(Val staves, int from, int to, int a, int b)
              { "voiceB", Val(b) } };
 }
 
-//! The first grace chord before the chord at `tick` on staff 1, voice 1
+//! The first grace chord of bar `bar` on staff 1, voice 1
 Chord* firstGrace(MasterScore* s, int bar)
 {
     Measure* m = s->firstMeasure();
@@ -999,7 +1006,8 @@ TEST_F(Agent_WriteVoice, SetDurationTupletsGraceAndRefusals)
                   "inside the tuplet");
     expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("x") } }, "duration must be");
     expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) } }, "duration must be");
-    expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 2) }, { "duration", Val("q") } }, "no note or rest starts");
+    expectRefused(s.get(), notes::setDuration, { { "at", atOffset(1, 2, "1/24") }, { "duration", Val("q") } }, "no note or rest starts");
+    expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("q~") } }, "duration must be");
 
     Outcome o = runOp(s.get(), notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("q") }, { "allowOverwrite", Val(true) } });
     ASSERT_TRUE(o.ret) << o.ret.text();
@@ -1023,6 +1031,7 @@ TEST_F(Agent_WriteVoice, ExchangeVoices)
     auto s = open("pickup-bar.mscz");
     ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | C5:h D5:q\nm2 v2 | E4:q F4:q G4:q\nm3 v1 | G5:h A5:q").ret);
     const std::string before = print(s.get(), 1, 2, 3);
+    EXPECT_FALSE(has(before, "m3(2) v2 |")) << before;
     const size_t idx = s->undoStack()->currentIndex();
     notes::Out out;
     Outcome o = runOp(s.get(), notes::exchangeVoices, xv(staffList({ 1 }), 2, 3, 1, 2), &out);
@@ -1033,7 +1042,11 @@ TEST_F(Agent_WriteVoice, ExchangeVoices)
     EXPECT_TRUE(has(after, "m2(1) v1 | E4:q F4:q G4:q\n")) << after;
     EXPECT_TRUE(has(after, "m2(1) v2 | C5:h D5:q\n")) << after;
     EXPECT_TRUE(has(after, "m3(2) v2 | G5:h A5:q\n")) << after;
-    EXPECT_TRUE(has(after, "m3(2) v1 | ")) << after; // filled with rests
+    // voice 1 of m3 is rests only (MuseScore fills it, edit.cpp:6428-6456)
+    const size_t at3 = after.find("m3(2) v1 | ");
+    ASSERT_NE(at3, std::string::npos) << after;
+    const std::string line3 = after.substr(at3, after.find('\n', at3) - at3);
+    EXPECT_EQ(line3.find_first_of("ABCDEFG"), std::string::npos) << line3;
     EXPECT_TRUE(has(o.ret ? out["text"].toString() : "", "m2(1) v2 | C5:h D5:q")) << out["text"].toString();
     undo(s.get());
     EXPECT_EQ(print(s.get(), 1, 2, 3), before);
@@ -1064,4 +1077,172 @@ TEST_F(Agent_WriteVoice, ExchangeVoicesReachesParts)
     EXPECT_TRUE(has(print(s.get(), 1, 4, 4), "m4 v1 | G4:h G4:h\n")) << print(s.get(), 1, 4, 4);
     EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v1 | G4:h G4:h\n")) << printOf(flute, 1, 4, 4);
     EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v2 | B4:w\n")) << printOf(flute, 1, 4, 4);
+}
+
+// --- review follow-ups: the remaining refusals, forceAccidental, parts and redo
+
+namespace {
+Chord* chordAt(MasterScore* s, int bar, int beat, int staff = 1)
+{
+    Measure* m = address::allMeasures(s).at(bar - 1);
+    ChordRest* cr = nullptr;
+    const Fraction tick = m->tick() + Fraction::fromTicks((beat - 1) * Constants::DIVISION);
+    if (!address::chordRestAt(s, m, tick, (staff - 1) * VOICES, cr) || !cr->isChord()) {
+        return nullptr;
+    }
+    return toChord(cr);
+}
+
+void redo(MasterScore* score)
+{
+    score->undoRedo(false, nullptr);
+}
+
+//! Bar `bar` of staff 1 becomes a one-bar measure repeat (it is emptied first, so MuseScore asks nothing)
+void makeMeasureRepeat(MasterScore* s, int bar)
+{
+    ASSERT_TRUE(runWrite(s, 1, "m" + std::to_string(bar) + " v1 | R").ret);
+    s->startCmd(muse::TranslatableString::untranslatable("test: measure repeat"));
+    s->cmdAddMeasureRepeat(address::allMeasures(s).at(bar - 1), 1, 0);
+    s->endCmd();
+}
+}
+
+// forceAccidental: the accidental shows in both pitch modes (needs both spellings in the NoteVal)
+TEST_F(Agent_WriteVoice, AddNoteToChordForceAccidental)
+{
+    auto s = open("pickup-bar.mscz");
+    ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | E4:h D4:q").ret);
+    Outcome o = runOp(s.get(), notes::addNoteToChord, { { "at", at(1, 2, 1) }, { "note", Val("G4") }, { "forceAccidental", Val(true) } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    const Note* n = chordAt(s.get(), 2, 1)->findNote(67);
+    ASSERT_TRUE(n);
+    ASSERT_TRUE(n->accidental());
+    EXPECT_EQ(n->accidental()->accidentalType(), AccidentalType::NATURAL);
+
+    auto t = open("transposing-instruments.mscz");
+    o = runOp(t.get(), notes::addNoteToChord, { { "at", at(2, 1, 1) }, { "note", Val("F#4") }, { "pitch", Val("written") },
+                  { "forceAccidental", Val(true) } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(print(t.get(), 2, 1, 1, true), "m1 v1 | [D4,F#4]:q")) << print(t.get(), 2, 1, 1, true);
+    const Note* w = chordAt(t.get(), 1, 1, 2)->findNote(64); // written F#4 on a B-flat staff sounds E4
+    ASSERT_TRUE(w);
+    ASSERT_TRUE(w->accidental());
+    EXPECT_EQ(w->accidental()->accidentalType(), AccidentalType::SHARP);
+    undo(t.get());
+    redo(t.get());
+    EXPECT_TRUE(has(print(t.get(), 2, 1, 1, true), "m1 v1 | [D4,F#4]:q")) << print(t.get(), 2, 1, 1, true);
+}
+
+// trill cue notes, tablature and percussion staves, generated notes, stale handles
+TEST_F(Agent_WriteVoice, NoteEditsRefuseStavesAndSpecialNotes)
+{
+    auto s = open("pickup-bar.mscz");
+    ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | [C5,E5]:h D5:q").ret);
+    Chord* c = chordAt(s.get(), 2, 1);
+    ASSERT_TRUE(c);
+    c->setIsTrillCueNote(true);
+    expectRefused(s.get(), notes::addNoteToChord, { { "at", at(1, 2, 1) }, { "note", Val("G5") } }, "trill");
+    expectRefused(s.get(), notes::removeNote, { { "at", at(1, 2, 1) }, { "note", Val("C5") } }, "trill");
+    expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("q") } }, "trill");
+    c->setIsTrillCueNote(false);
+
+    Note* gen = c->findNote(72);
+    ASSERT_TRUE(gen);
+    gen->setGenerated(true);
+    expectRefused(s.get(), notes::removeNote, { { "at", at(1, 2, 1) }, { "note", Val("C5") } }, "generated");
+    gen->setGenerated(false);
+
+    const Val handle(core::makeHandle(c->findNote(76)));
+    ASSERT_TRUE(runOp(s.get(), notes::removeNote, { { "at", handle } }).ret);
+    expectRefused(s.get(), notes::removeNote, { { "at", handle } }, "E_STALE_HANDLE");
+
+    const StaffType* original = s->staff(0)->staffType(Fraction(0, 1));
+    const StaffType saved = *original;
+    s->staff(0)->setStaffType(Fraction(0, 1), *StaffType::preset(StaffTypes::TAB_6SIMPLE));
+    expectRefused(s.get(), notes::addNoteToChord, { { "at", at(1, 2, 1) }, { "note", Val("G5") } }, "tablature");
+    expectRefused(s.get(), notes::removeNote, { { "at", at(1, 2, 1) } }, "tablature");
+    s->staff(0)->setStaffType(Fraction(0, 1), saved);
+    // a percussion staff is one whose instrument uses a drumset (Staff::isDrumStaff, staff.cpp:1879)
+    s->staff(0)->part()->instrument()->setUseDrumset(true);
+    expectRefused(s.get(), notes::addNoteToChord, { { "at", at(1, 2, 1) }, { "note", Val("G5") } }, "percussion");
+    s->staff(0)->part()->instrument()->setUseDrumset(false);
+}
+
+// measure repeats: set_duration and exchange_voices refuse them, also when a value would grow over one
+TEST_F(Agent_WriteVoice, NoteEditsRefuseMeasureRepeats)
+{
+    auto s = open("pickup-bar.mscz");
+    ASSERT_TRUE(runWrite(s.get(), 1, "m4 v1 | B4:h A4:q").ret);
+    makeMeasureRepeat(s.get(), 5);
+    expectRefused(s.get(), notes::setDuration, { { "at", at(1, 5, 1) }, { "duration", Val("q") } }, "measure repeat");
+    expectRefused(s.get(), notes::setDuration, { { "at", at(1, 4, 3) }, { "duration", Val("h") }, { "allowOverwrite", Val(true) } },
+                  "overwrite the measure repeat");
+    expectRefused(s.get(), notes::exchangeVoices, xv(staffList({ 1 }), 4, 5, 1, 2), "measure repeat");
+}
+
+TEST_F(Agent_WriteVoice, ExchangeVoicesMoreRefusals)
+{
+    auto s = open("transposing-instruments.mscz");
+    expectRefused(s.get(), notes::exchangeVoices, xv(Val(1), 1, 1, 1, 2), "at least one staff");
+    expectRefused(s.get(), notes::exchangeVoices, xv(staffList({ 1 }), 99, 99, 1, 2), "fromMeasure 99 is outside");
+    expectRefused(s.get(), notes::exchangeVoices, xv(staffList({ 1 }), 1, 1, 0, 2), "voiceA 0 is outside 1-4");
+    muse::ValList half;
+    half.emplace_back(Val(1.5));
+    expectRefused(s.get(), notes::exchangeVoices, xv(Val(half), 1, 1, 1, 2), "whole number");
+    Params p = xv(staffList({ 1 }), 1, 1, 1, 2);
+    p["toMeasure"] = Val(1.5);
+    expectRefused(s.get(), notes::exchangeVoices, p, "toMeasure must be a whole number");
+}
+
+// RN-04 and set_duration in a score with linked parts: the part follows, and undo/redo too
+TEST_F(Agent_WriteVoice, RemoveNoteAndSetDurationReachParts)
+{
+    auto s = open("parts-linked.mscz");
+    Score* flute = excerptNamed(s.get(), "Flute");
+    ASSERT_TRUE(flute);
+    ASSERT_TRUE(runWrite(s.get(), 1, "m4 v1 | [B4,D5]:h C5:h").ret);
+    EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v1 | [B4,D5]:h C5:h\n")) << printOf(flute, 1, 4, 4);
+    Outcome o = runOp(s.get(), notes::removeNote, { { "at", at(1, 4, 1) }, { "note", Val("D5") } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v1 | B4:h C5:h\n")) << printOf(flute, 1, 4, 4);
+    o = runOp(s.get(), notes::setDuration, { { "at", at(1, 4, 3) }, { "duration", Val("q") } });
+    ASSERT_TRUE(o.ret) << o.ret.text();
+    EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v1 | B4:h C5:q r:q\n")) << printOf(flute, 1, 4, 4);
+    undo(s.get());
+    EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v1 | B4:h C5:h\n")) << printOf(flute, 1, 4, 4);
+    undo(s.get());
+    EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v1 | [B4,D5]:h C5:h\n")) << printOf(flute, 1, 4, 4);
+    redo(s.get());
+    redo(s.get());
+    EXPECT_TRUE(has(printOf(flute, 1, 4, 4), "m4 v1 | B4:h C5:q r:q\n")) << printOf(flute, 1, 4, 4);
+    EXPECT_TRUE(has(print(s.get(), 1, 4, 4), "m4 v1 | B4:h C5:q r:q\n")) << print(s.get(), 1, 4, 4);
+}
+
+// redo after undo gives the same bars, for each of the four
+TEST_F(Agent_WriteVoice, NoteEditsRedo)
+{
+    auto s = open("pickup-bar.mscz");
+    ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | E4:h D4:q\nm2 v2 | C4:q C4:q C4:q\nm3 v1 | C5:h~ C5:q~\nm4 v1 | C5:h.").ret);
+    struct Step {
+        muse::Ret (*op)(MasterScore*, const Params&, notes::Out&);
+        Params p;
+    };
+    const std::vector<Step> steps = {
+        { notes::addNoteToChord, { { "at", at(1, 3, 1) }, { "note", Val("E5") } } },
+        { notes::removeNote, { { "at", at(1, 2, 3) } } },
+        { notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("q") } } },
+        { notes::exchangeVoices, xv(staffList({ 1 }), 2, 2, 1, 2) },
+    };
+    for (const Step& st : steps) {
+        const std::string before = print(s.get(), 1, 2, 4);
+        Outcome o = runOp(s.get(), st.op, st.p);
+        ASSERT_TRUE(o.ret) << o.ret.text();
+        const std::string after = print(s.get(), 1, 2, 4);
+        EXPECT_NE(after, before);
+        undo(s.get());
+        EXPECT_EQ(print(s.get(), 1, 2, 4), before);
+        redo(s.get());
+        EXPECT_EQ(print(s.get(), 1, 2, 4), after);
+    }
 }

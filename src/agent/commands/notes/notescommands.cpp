@@ -163,7 +163,7 @@ const char* TARGET_DOC = "a handle, or {staff, voice?, measure, beat|offset}: st
 
 void addTarget(CommandInfo& c, const std::string& what)
 {
-    c.input["at"] = { DataType::Object, what + ": " + TARGET_DOC, true };
+    c.input["at"] = { DataType::Undefined, what + ": " + TARGET_DOC, true }; // a handle string or an object
     c.input["pitch"] = { DataType::String, "sounding (default) or written: how the note names are meant" };
     c.input["pitch"].enumValues = { "sounding", "written" };
     c.output["text"] = { DataType::String, "The touched bars of that staff, as score_read prints them" };

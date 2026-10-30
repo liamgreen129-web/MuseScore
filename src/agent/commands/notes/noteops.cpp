@@ -329,6 +329,13 @@ Ret refuseUnsupportedStaff(MasterScore* score, const ChordRest* cr)
         return makeErr(Err::InvalidArg, address::where(score, cr) + " is on a tablature or percussion staff; "
                        "those are not supported yet (string/fret and drum heads)");
     }
+    // a linked tablature staff would get the note without string and fret (specs/notes.md G9)
+    for (const Staff* linked : staff->staffList()) {
+        if (linked != staff && linked->isTabStaff(cr->tick())) {
+            return makeErr(Err::InvalidArg, address::where(score, cr) + " is linked to a tablature staff; "
+                           "that is not supported yet (string/fret)");
+        }
+    }
     return muse::make_ok();
 }
 
@@ -409,7 +416,7 @@ std::optional<TDuration> parseDuration(const std::string& text)
     }
     const nt::VoiceLine* vl = std::get_if<nt::VoiceLine>(&r.doc.lines.front());
     const nt::Event* e = vl && vl->items.size() == 1 ? std::get_if<nt::Event>(&vl->items.front()) : nullptr;
-    if (!e || e->kind != nt::EventKind::Rest) {
+    if (!e || e->kind != nt::EventKind::Rest || !e->marks.empty() || e->slurOpen || e->slurClose) {
         return std::nullopt;
     }
     static const std::pair<nt::BaseDuration, DurationType> types[] = {
@@ -480,19 +487,23 @@ Ret mu::agent::notes::addNoteToChord(MasterScore* score, const Params& p, Out& o
     }
 
     NoteVal nv(s.pitch);
-    // one spelling given, the other derived by Note::setNval, as write_voice does
-    if (written) {
-        nv.tpc2 = s.tpc2;
-    } else {
-        nv.tpc1 = s.tpc1;
-    }
-    if (chain.size() > 1) {
-        // adds to every chord of the chain and ties the new notes (edit.cpp:632-697); it selects
-        // and moves the input state, which the transaction's SelectionGuard puts back
-        score->addNoteToTiedChord(chord, nv, force);
-    } else {
-        InputState is; // private: Score::addNote then leaves the selection and the user's input position alone
-        score->addNote(chord, nv, force, {}, &is);
+    // both spellings: Score::addNote reads one of them for forceAccidental (edit.cpp:597-598)
+    nv.tpc1 = s.tpc1;
+    nv.tpc2 = s.tpc2;
+    // Score::addNoteToTiedChord's recipe (edit.cpp:632-697; private upstream): the note in every
+    // chord of the chain, each tied to the next. A private InputState keeps Score::addNote off the
+    // selection and the user's input position (edit.cpp:614-620)
+    Note* last = nullptr;
+    for (Chord* c : chain) {
+        InputState is;
+        Note* n = score->addNote(c, nv, force, {}, &is);
+        if (!n) {
+            return makeErr(Err::Refused, "MuseScore did not add the note at " + address::where(score, c));
+        }
+        if (last) {
+            addTieBetween(last, n);
+        }
+        last = n;
     }
 
     Note* prev = nullptr;
@@ -643,6 +654,10 @@ Ret mu::agent::notes::setDuration(MasterScore* score, const Params& p, Out& out)
                 continue;
             }
             ChordRest* next = toChordRest(e);
+            if (next->isMeasureRepeat()) {
+                return makeErr(Err::InvalidArg, "a " + dtext + " at " + here + " would overwrite the measure repeat at "
+                               + address::where(score, next) + "; write the bar out first");
+            }
             if (!tuplet) {
                 for (Tuplet* t = next->tuplet(); t; t = t->tuplet()) {
                     if (t->tick() + t->actualTicks() > newEnd) {
@@ -675,10 +690,26 @@ Ret mu::agent::notes::setDuration(MasterScore* score, const Params& p, Out& out)
         }
     } else {
         // across the bar line: MuseScore splits it into tied notes (or rests) that add up (cmd.cpp:1810-1851)
-        if (newEnd < score->endTick() && !chordRestStarting(score, newEnd, track)) {
-            return makeErr(Err::PostCondition, "nothing starts where the new value ends; nothing was changed");
+        ChordRest* cur = now;
+        while (cur && cur->endTick() < newEnd) {
+            ChordRest* next = nullptr;
+            if (cur->isChord()) {
+                const Note* n = toChord(cur)->notes().front();
+                next = n->tieFor() && n->tieFor()->endNote() ? n->tieFor()->endNote()->chord() : nullptr;
+            } else {
+                next = chordRestStarting(score, cur->endTick(), track);
+                next = next && next->isRest() ? next : nullptr;
+            }
+            if (next && next->tick() != cur->endTick()) {
+                next = nullptr;
+            }
+            cur = next;
         }
-        lastBar = score->tick2measure(newEnd - Fraction::fromTicks(1));
+        if (!cur || cur->endTick() != newEnd) {
+            return makeErr(Err::PostCondition, "the new value is not split into tied notes or rests that add up to "
+                           + dtext + "; nothing was changed");
+        }
+        lastBar = cur->measure();
     }
     out["handle"] = Val(core::makeHandle(now));
     printBars(score, m, lastBar, staff, written, out);
@@ -688,8 +719,15 @@ Ret mu::agent::notes::setDuration(MasterScore* score, const Params& p, Out& out)
 // --- exchange_voices
 
 namespace {
-//! The chords of a voice in a bar, as (tick, pitches): what has to swap
-using VoiceContent = std::vector<std::pair<Fraction, std::vector<int> > >;
+//! The chords of a voice in a bar, as (tick, length, pitches): what has to swap. Rests are left
+//! out: voice 1 gets rests where the other voice had none (edit.cpp:6428-6456)
+struct ChordContent {
+    Fraction tick;
+    Fraction ticks;
+    std::vector<int> pitches;
+    bool operator==(const ChordContent& o) const { return tick == o.tick && ticks == o.ticks && pitches == o.pitches; }
+};
+using VoiceContent = std::vector<ChordContent>;
 
 VoiceContent chordsOf(const Measure* m, track_idx_t track)
 {
@@ -701,10 +739,29 @@ VoiceContent chordsOf(const Measure* m, track_idx_t track)
             for (const Note* n : toChord(e)->notes()) {
                 pitches.push_back(n->pitch());
             }
-            out.push_back({ s->tick(), pitches });
+            out.push_back({ s->tick(), toChord(e)->actualTicks(), pitches });
         }
     }
     return out;
+}
+
+//! Voice 1 fills the bar with no gap
+bool voiceOneComplete(const Measure* m, staff_idx_t staff)
+{
+    const Fraction end = m->tick() + m->stretchedLen(m->score()->staff(staff)); // local time signatures stretch it
+    Fraction at = m->tick();
+    for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+        const EngravingItem* e = s->element(staff * VOICES);
+        if (!e || !e->isChordRest()) {
+            continue;
+        }
+        const ChordRest* cr = toChordRest(e);
+        if (cr->tick() != at || (cr->isRest() && toRest(cr)->isGap())) {
+            return false;
+        }
+        at = cr->isMeasureRepeat() || cr->isFullMeasureRest() ? end : cr->endTick();
+    }
+    return at == end;
 }
 
 Ret wholeNumber(const Params& p, const char* key, int lo, int hi, int& out)
@@ -743,6 +800,17 @@ Ret mu::agent::notes::exchangeVoices(MasterScore* score, const Params& p, Out& o
     for (size_t i = 1; i < staves.size(); ++i) {
         if (staves[i] != staves[i - 1] + 1) {
             return makeErr(Err::Range, "staves must be next to each other (a range selection), e.g. [2, 3, 4]");
+        }
+    }
+    // undoExchangeVoice also swaps every linked staff (edit.cpp:6421-6424); two linked staves in the
+    // list would be swapped twice, back to where they were
+    for (staff_idx_t si : staves) {
+        for (const Staff* linked : score->staff(si)->staffList()) {
+            if (linked->score() == score && linked->idx() != si
+                && std::find(staves.begin(), staves.end(), linked->idx()) != staves.end()) {
+                return makeErr(Err::InvalidArg, "staves " + std::to_string(si + 1) + " and " + std::to_string(linked->idx() + 1)
+                               + " are linked; give only one of them (the other follows)");
+            }
         }
     }
     const std::vector<Measure*> bars = address::allMeasures(score);
@@ -803,6 +871,10 @@ Ret mu::agent::notes::exchangeVoices(MasterScore* score, const Params& p, Out& o
             if (chordsOf(bars[i - 1], si * VOICES + va) != wasB || chordsOf(bars[i - 1], si * VOICES + vb) != wasA) {
                 return makeErr(Err::PostCondition, "voices " + std::to_string(a) + " and " + std::to_string(b) + " of m"
                                + std::to_string(i) + ", staff " + std::to_string(si + 1) + " did not swap; nothing was changed");
+            }
+            if (!voiceOneComplete(bars[i - 1], si)) {
+                return makeErr(Err::PostCondition, "voice 1 of m" + std::to_string(i) + ", staff " + std::to_string(si + 1)
+                               + " has a gap after the swap; nothing was changed");
             }
         }
     }

@@ -24,7 +24,7 @@
             "part": "Flute"
           }
         ],
-        "fromMeasure": 3,
+        "fromMeasure": 4,
         "toMeasure": 4,
         "voiceA": 1,
         "voiceB": 2
@@ -40,8 +40,7 @@
             }
           ]
         }
-      },
-      "note": "bar 3 has no voice 2: voice 1 gets rests there"
+      }
     },
     {
       "tool": "exchange_voices",
