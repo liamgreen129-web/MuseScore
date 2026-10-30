@@ -1,0 +1,93 @@
+{
+  "id": "N04",
+  "title": "exchange_voices in a score with linked parts: the parts follow; undo and redo round-trip",
+  "source": "specs/notes.md NOTES-XV-01..03",
+  "fixture": "synthetic/parts-linked.mscz",
+  "specs": [
+    "specs/notes.md exchange_voices"
+  ],
+  "steps": [
+    {
+      "tool": "write_voice",
+      "writes": true,
+      "args": {
+        "staff": 1,
+        "content": "m4 v1 | B4:w\nm4 v2 | G4:h G4:h"
+      }
+    },
+    {
+      "tool": "exchange_voices",
+      "writes": true,
+      "args": {
+        "staves": [
+          {
+            "part": "Flute"
+          }
+        ],
+        "fromMeasure": 4,
+        "toMeasure": 4,
+        "voiceA": 1,
+        "voiceB": 2
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m4 v1 | G4:h G4:h"
+            },
+            {
+              "contains": "m4 v2 | B4:w"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "exchange_voices",
+      "args": {
+        "staves": [
+          1
+        ],
+        "fromMeasure": 1,
+        "toMeasure": 1,
+        "voiceA": 2,
+        "voiceB": 2
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "exchange_voices",
+      "args": {
+        "staves": [
+          1,
+          3
+        ],
+        "fromMeasure": 1,
+        "toMeasure": 1,
+        "voiceA": 1,
+        "voiceB": 2
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 2
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/N04_exchange_voices_linked_parts.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

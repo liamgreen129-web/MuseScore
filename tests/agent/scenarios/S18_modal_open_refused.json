@@ -7,7 +7,7 @@
     "assessment.md risks (E_BUSY / modal)",
     "specs/session.md"
   ],
-  "manual": "Needs a test hook that opens and closes a modal dialog in the instance. main has none yet (test_dispatch covers note input and playback); the conductor adds a modal action to test_dispatch before Gate G2. Until then this scenario SKIPs. Manual alternative: open Preferences in the instance by hand and run the add_dynamic step.",
+  "manual": "Uses the test-only test_modal hook (MUSESCORE_AGENT_TEST_COMMANDS=1), which opens the framework's test dialog non-modally through IInteractive (DECISIONS 2026-10-30). Manual alternative: open Preferences in the instance by hand and run the add_dynamic step.",
   "needsHooks": [
     "test_modal"
   ],

@@ -30,7 +30,7 @@ namespace mu::engraving {
 class MasterScore;
 }
 
-//! tie, tuplet and grace (specs/notes.md): small edits to existing notes, addressed by a handle or
+//! tie, tuplet, grace and the other single-element edits (specs/notes.md): small edits to existing notes, addressed by a handle or
 //! {staff, voice, measure, beat} (address/address.h). Each validates everything first, then makes
 //! the UI's engraving call, then checks the effect. They run inside the caller's transaction.
 namespace mu::agent::notes {
@@ -39,4 +39,10 @@ using Out = std::map<std::string, muse::Val>;
 muse::Ret tie(mu::engraving::MasterScore* score, const Params& p, Out& out);
 muse::Ret tuplet(mu::engraving::MasterScore* score, const Params& p, Out& out);
 muse::Ret grace(mu::engraving::MasterScore* score, const Params& p, Out& out);
+
+//! add_note_to_chord, remove_note, set_duration, exchange_voices (specs/notes.md)
+muse::Ret addNoteToChord(mu::engraving::MasterScore* score, const Params& p, Out& out);
+muse::Ret removeNote(mu::engraving::MasterScore* score, const Params& p, Out& out);
+muse::Ret setDuration(mu::engraving::MasterScore* score, const Params& p, Out& out);
+muse::Ret exchangeVoices(mu::engraving::MasterScore* score, const Params& p, Out& out);
 }

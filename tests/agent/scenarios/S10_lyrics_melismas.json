@@ -110,7 +110,7 @@
           }
         ]
       },
-      "error": "E_BAD_ARG",
+      "error": "E_INVALID_ARG",
       "note": "melisma ends before it starts"
     }
   ],

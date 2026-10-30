@@ -163,7 +163,7 @@ const char* TARGET_DOC = "a handle, or {staff, voice?, measure, beat|offset}: st
 
 void addTarget(CommandInfo& c, const std::string& what)
 {
-    c.input["at"] = { DataType::Object, what + ": " + TARGET_DOC, true };
+    c.input["at"] = { DataType::Undefined, what + ": " + TARGET_DOC, true }; // a handle string or an object
     c.input["pitch"] = { DataType::String, "sounding (default) or written: how the note names are meant" };
     c.input["pitch"].enumValues = { "sounding", "written" };
     c.output["text"] = { DataType::String, "The touched bars of that staff, as score_read prints them" };
@@ -237,6 +237,107 @@ void mu::agent::registerNotesCommands(CommandRegistry& registry)
         c.input["note"] = { DataType::String, "The grace note's pitch, e.g. \"D5\" or \"F#4\"", true };
         c.output["handle"] = { DataType::String, "Handle of the grace note" };
         c.write = [](const Params& p, WriteContext& ctx) { return notes::grace(ctx.score, p, ctx.out); };
+        registry.add(c);
+    }
+    {
+        CommandInfo c;
+        c.uri = "command://notation/add_note_to_chord";
+        c.name = "add_note_to_chord";
+        c.title = "Add a note to a chord";
+        c.description
+            = "Add one note, at the pitch and spelling given, to an existing note or chord, as Shift+letter does on a "
+              "selected note. A chord tied to others gets the note in every chord of the tie chain, tied through, "
+              "unless extendThroughTies is false (then the target chord only). forceAccidental shows the accidental "
+              "even where the key makes it unneeded. Refused (nothing changes): a rest (write the note with "
+              "write_voice), a chord that already has that pitch (E_EXISTS; also in a tied chord), tablature and "
+              "percussion staves, a trill cue note, a pitch outside MIDI 0-127. One undo entry.";
+        c.kind = CommandKind::Write;
+        c.undoName = "Add note to chord";
+        addTarget(c, "The note or chord to add to");
+        c.input["note"] = { DataType::String, "The new note's pitch, e.g. \"E5\" or \"F#4\"", true };
+        c.input["extendThroughTies"] = { DataType::Boolean, "Add to every chord of the tie chain (default true)" };
+        c.input["forceAccidental"] = { DataType::Boolean, "Show the accidental even when the key implies it (default false)" };
+        c.output["handle"] = { DataType::String, "Handle of the new note in the target chord" };
+        c.output["chords"] = { DataType::Integer, "How many chords got the note (more than 1 through ties)" };
+        c.write = [](const Params& p, WriteContext& ctx) { return notes::addNoteToChord(ctx.score, p, ctx.out); };
+        registry.add(c);
+    }
+    {
+        CommandInfo c;
+        c.uri = "command://notation/remove_note";
+        c.name = "remove_note";
+        c.title = "Remove a note";
+        c.description
+            = "Remove one note, as selecting it and pressing Delete does: from a chord the note goes; the only note "
+              "of a chord leaves a rest of the same length (inside its tuplet, if any), unless whenLastNote is error; "
+              "the only note of a grace chord removes the grace note. Ties into and out of the note go with it. at "
+              "is a note handle, or a chord (handle or address) with note naming the pitch; a single note needs no "
+              "pitch. Refused (nothing changes): a rest, a pitch the chord does not have (spelling counts), "
+              "tablature and percussion staves, a trill cue note. One undo entry.";
+        c.kind = CommandKind::Write;
+        c.undoName = "Remove note";
+        addTarget(c, "The note (its handle), or its chord");
+        c.input["note"] = { DataType::String, "Which note of the chord, by pitch, e.g. \"E5\" (needed for chords)" };
+        c.input["whenLastNote"] = { DataType::String, "rest (default): the only note becomes a rest; error: refuse" };
+        c.input["whenLastNote"].enumValues = { "rest", "error" };
+        c.output["handle"] = { DataType::String, "Handle of the chord, the rest left, or the main chord of a grace note" };
+        c.output["leftRest"] = { DataType::Boolean, "The chord's only note was removed and a rest took its place" };
+        c.write = [](const Params& p, WriteContext& ctx) { return notes::removeNote(ctx.score, p, ctx.out); };
+        registry.add(c);
+    }
+    {
+        CommandInfo c;
+        c.uri = "command://notation/set_duration";
+        c.name = "set_duration";
+        c.title = "Change a note's or rest's length";
+        c.description
+            = "Change the length of a note, chord or rest, as pressing a duration key (and dot) on it does. "
+              "duration is a compact value: \"w\", \"h\", \"q.\", \"e\", \"s\", \"h..\". Shorter: the rest "
+              "of the old length becomes rests, and ties out of a shortened chord go. Longer: it takes over the "
+              "events after it; when any of those are notes, allowOverwrite must be true. Past the bar line it is "
+              "split into tied notes (or rests). A grace note changes its written value only. Refused (nothing "
+              "changes): growing past the end of the score, past the end of the tuplet it is in, or to end inside "
+              "a tuplet after it; measure repeats; a trill cue note. To rewrite rhythms of whole bars, use "
+              "write_voice. One undo entry.";
+        c.kind = CommandKind::Write;
+        c.undoName = "Set duration";
+        addTarget(c, "The note, chord or rest");
+        c.input["duration"] = { DataType::String, "The new value, e.g. \"q.\" or \"e\"", true };
+        c.input["allowOverwrite"] = { DataType::Boolean, "Let a longer value replace following notes (default false)" };
+        c.output["handle"] = { DataType::String, "Handle of the element now at that place" };
+        c.write = [](const Params& p, WriteContext& ctx) { return notes::setDuration(ctx.score, p, ctx.out); };
+        registry.add(c);
+    }
+    {
+        CommandInfo c;
+        c.uri = "command://notation/exchange_voices";
+        c.name = "exchange_voices";
+        c.title = "Exchange two voices";
+        c.description
+            = "Swap the contents of two voices in whole bars of one or more staves, as the exchange-voice commands "
+              "do on a range selection. Slurs move with their notes; dynamics, hairpins and other lines keep their "
+              "voice. When voice 1 is swapped with a voice that is empty or partial, voice 1 is filled with rests. "
+              "Linked staves and parts follow. staves: staff numbers or {part, index}, next to each other. "
+              "fromMeasure/toMeasure: bars by position, 1-based. Refused (nothing changes): the same voice twice, "
+              "bars or staves outside the score, staves not next to each other, measure repeats. One undo entry.";
+        c.kind = CommandKind::Write;
+        c.undoName = "Exchange voices";
+        c.input["staves"] = { DataType::Array, "Staves (numbers or {part, index}), next to each other", true };
+        c.input["fromMeasure"] = { DataType::Integer, "First bar, by position (1-based)", true };
+        c.input["fromMeasure"].min = Val(1);
+        c.input["toMeasure"] = { DataType::Integer, "Last bar, by position (1-based)", true };
+        c.input["toMeasure"].min = Val(1);
+        c.input["voiceA"] = { DataType::Integer, "One voice, 1-4", true };
+        c.input["voiceA"].min = Val(1);
+        c.input["voiceA"].max = Val(4);
+        c.input["voiceB"] = { DataType::Integer, "The other voice, 1-4", true };
+        c.input["voiceB"].min = Val(1);
+        c.input["voiceB"].max = Val(4);
+        c.input["pitch"] = { DataType::String, "sounding (default) or written: how the returned bars spell notes" };
+        c.input["pitch"].enumValues = { "sounding", "written" };
+        c.output["text"] = { DataType::String, "The swapped bars of those staves, as score_read prints them" };
+        c.output["bars"] = { DataType::String, "The bars touched, \"3\" or \"3-6\"" };
+        c.write = [](const Params& p, WriteContext& ctx) { return notes::exchangeVoices(ctx.score, p, ctx.out); };
         registry.add(c);
     }
     {
