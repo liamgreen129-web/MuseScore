@@ -15,7 +15,7 @@ Updated by the conductor at the end of every session and before every STOP.
   3. Run `scenarios/run.py`; N03, N04, TX01-07 and PT01-07 need `--update-goldens` once, then review the goldens.
   4. Check that test_modal's dialog does not bring the background instance forward (DECISIONS 2026-10-30).
   5. Merge into agent/4.7 per protocol.
-  6. P2.5: S01-S20 all passing, the 8-hour soak (tests/agent/harness/soak.py --minutes 480), the G2 report, then **STOP for Liam's G2 sign-off**.
+  6. P2.5: S01-S20 and all group scenarios passing (no soak: DECISIONS 2026-10-30), the G2 report, then **STOP for Liam's G2 sign-off**.
   7. Follow-up: can closing a score after a big range delete crash the real app (DECISIONS 2026-10-29, upstream bug)?
 - **Cloud session: what works there and what does not.**
   - The build and every test need this Mac: scripts/env.sh points at ~/Qt/6.10.2/macos and ~/musescore_deps_macos; the integration tests and scenarios launch the macOS app bundle (agent.install/mscore.app) with `open`; signing uses the "MuseScore Agent Local" keychain identity. A Linux cloud box has none of these, so it cannot build, run the unit tests, or run scenarios unless it sets up a Linux build of agent_tests itself (Qt 6.10.2 + MuseScore Linux deps; not tried, and the gtest tree alone is a large build).

@@ -1,5 +1,7 @@
 # Moving to the Mac mini
 
+**Shortcut:** AirDrop `setup-mac-mini.command` (repo root) to the mini and double-click it. It does §2-§4 and starts Claude Code with the prompt for §2-§6.
+
 Runbook for moving MuseScore Agent from the MacBook Pro to the Mac mini (DECISIONS
 2026-10-29: "Start on the MacBook Pro, move to the Mac mini later"). Everything in git
 carries over through the fork. What does not: Qt and the prebuilt deps, ccache, the
@@ -83,12 +85,9 @@ python3 -I tests/agent/scenarios/run.py                    # then everything, no
 Also check that `test_modal`'s dialog does not bring the hidden instance forward (S18).
 When all of it passes, merge `agent/4.7-nfhpdz` into `agent/4.7` per PLAN.md's protocol.
 
-## 7. The G2 soak runs unattended
+## 7. No soak for G2
 
-The 8-hour soak (P2.5) needs no one watching:
-`python3 -I tests/agent/harness/soak.py --minutes 480 --seed 1 --log soak.jsonl`,
-started in the evening; it runs a hidden instance and stops by itself. Read the summary in
-the morning. Any failure replays from the log (`--replay soak.jsonl`).
+Liam dropped the soak from G2 (DECISIONS 2026-10-30).
 
 ## 8. First message to Claude Code on the mini
 
