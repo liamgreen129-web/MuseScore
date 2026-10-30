@@ -75,7 +75,7 @@
         "text": "accel.",
         "system": true
       },
-      "note": "a system text line goes on the top staff and into every part, whatever staff the address names; score_read does not print system text lines (still true after ddc7dc16fe), so the next step checks the export"
+      "note": "a system text line goes on the top staff and into every part, whatever staff the address names"
     },
     {
       "assert": "exportMember",
@@ -162,6 +162,12 @@
             },
             {
               "contains": "+trl[+trl]"
+            },
+            {
+              "contains": "+txt[\"accel.\""
+            },
+            {
+              "contains": "+txt]"
             }
           ]
         }
@@ -177,8 +183,5 @@
   "invariants": {
     "validate": true,
     "undoRedo": true
-  },
-  "questions": [
-    "score_read prints no mark for a system text line (TextLine with the system flag); once it does, check +txt[\"accel.\" on m1 beat 1 and +txt] on m2 beat 4 of staff 1 here."
-  ]
+  }
 }

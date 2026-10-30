@@ -153,6 +153,40 @@ void mu::agent::registerTestCommands(CommandRegistry& registry)
         registry.add(c);
     }
     {
+        // S18: the write guard refuses with E_MODAL_OPEN while a dialog is open. The framework's
+        // own test dialog (uimodule.cpp:127), opened through IInteractive so it is on the provider's
+        // stack the way a real dialog is. open() does not block; the stack entry appears one event
+        // loop turn later (interactiveprovider.cpp:688-721), so a later request sees it.
+        CommandInfo c;
+        c.uri = "command://test/test_modal";
+        c.name = "test_modal";
+        c.title = "TEST: open or close a modal dialog";
+        c.description = "Test only. Opens (or closes) the framework's test dialog, so the write guards see a modal open.";
+        c.input["action"] = { DataType::String, "open or close", true };
+        c.input["action"].enumValues = { "open", "close" };
+        c.kind = CommandKind::Control;
+        c.output["opened"] = { DataType::Boolean, "The test dialog is on the dialog stack now (false straight after open: it is added a turn later)" };
+        c.handler = [](const Params& p, AgentEnv& env) {
+            Result r;
+            if (!env.interactive()) {
+                r.ret = makeErr(Err::Internal, "no interactive service");
+                return r;
+            }
+            static const muse::Uri dialog("muse://devtools/interactive/testdialog");
+            const std::string action = p.at("action").toString();
+            if (action == "open") {
+                if (!env.interactive()->isOpened(dialog).val) {
+                    env.interactive()->open(dialog);
+                }
+            } else if (env.interactive()->isOpened(dialog).val) {
+                env.interactive()->closeSync(muse::UriQuery(dialog));
+            }
+            r.values["opened"] = Val(env.interactive()->isOpened(dialog).val);
+            return r;
+        };
+        registry.add(c);
+    }
+    {
         CommandInfo c;
         c.uri = "command://test/test_fail";
         c.name = "test_fail";
