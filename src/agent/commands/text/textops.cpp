@@ -1474,7 +1474,14 @@ Ret mu::agent::text::addLyric(const Params& p, MasterScore* score, Out& out)
         made.push_back(l);
     }
 
-    if (before && before->ticks() != beforeTicks && before->ticks().isNotZero()) {
+    if (before && before->ticks() == Lyrics::TEMP_MELISMA_TICKS && beforeTicks != Lyrics::TEMP_MELISMA_TICKS) {
+        // adjustPrevious leaves eps when no chord is left for the extender (lyrics.cpp:310-315); the
+        // next layout's removeInvalidSegments then sets 0 without undo (lyrics.cpp:588-602), so the
+        // saved score depended on whether a layout had run, and redo did not restore the edit's
+        // state. Make that end result part of the edit.
+        before->undoChangeProperty(Pid::LYRIC_TICKS, Fraction(0, 1));
+        adjusted.push_back(lyricWhere(score, before) + ": extender removed (\"" + syls.front().text + "\" starts where it ended)");
+    } else if (before && before->ticks() != beforeTicks && before->ticks().isNotZero()) {
         adjusted.push_back(lyricWhere(score, before) + ": extender shortened to end before \"" + syls.front().text + "\"");
     }
 

@@ -33,6 +33,8 @@ def norm_golden(data):
     EID (and part copies name it in <linkedTo>), so a golden made by one run never matches the next. Goldens only; within a run (undo,
     redo, unchanged-after-error) ids are compared as they are."""
     data = re.sub(rb"<eid>[^<]*</eid>", b"<eid/>", norm_xml(data))
+    # the MusicXML export stamps the day it runs when the score has no creation date
+    data = re.sub(rb'(<miscellaneous-field name="creationDate">)[^<]*(</miscellaneous-field>)', rb"\1\2", data)
     return re.sub(rb"<linkedTo>[^<]*</linkedTo>", b"<linkedTo/>", data)
 
 

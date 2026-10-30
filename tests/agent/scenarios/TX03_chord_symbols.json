@@ -108,11 +108,11 @@
           "measure": 3,
           "beat": 2
         },
-        "text": "foo"
+        "text": "xyz"
       },
       "expect": {
         "recognised": false,
-        "name": "foo"
+        "name": "xyz"
       }
     },
     {
@@ -217,7 +217,7 @@
               "contains": "{G7/B}"
             },
             {
-              "contains": "{foo}"
+              "contains": "{xyz}"
             },
             {
               "contains": "{Bb7}"

@@ -1258,14 +1258,14 @@ TEST_F(Agent_Text, LyricsInTheMelismaFixture)
     EXPECT_FALSE(out.count("adjusted"));
     ASSERT_TRUE(crAt(score.get(), 3, 2)->lyrics(2, PlacementV::BELOW));
 
-    // a verse-1 syllable under the extender: the extender is shortened, as entering it in the UI does
+    // a verse-1 syllable under the extender: no chord is left for it, so it goes. adjustPrevious sets
+    // eps (lyrics.cpp:310-315) and layout drops that to 0 without undo (lyrics.cpp:588-602), as in
+    // the UI; the command makes the 0 part of its own undoable edit
     addsOneEntry(LYR, lyricArgs({ syl("oh") }, 3, 1),
-                 // adjustPrevious sets eps (s->tick() == prev->tick(), lyrics.cpp:310-315); the next layout's
-                 // removeInvalidSegments then drops the extender to 0 (lyrics.cpp:588-602), as in the UI
                  [&] { EXPECT_EQ(light->ticks(), Fraction(0, 1)); },
                  [&] { EXPECT_EQ(light->ticks(), lightTicks); });
     ASSERT_TRUE(out.count("adjusted"));
-    EXPECT_NE(out.at("adjusted").toList().front().toString().find("extender shortened"), std::string::npos)
+    EXPECT_NE(out.at("adjusted").toList().front().toString().find("extender removed"), std::string::npos)
         << out.at("adjusted").toList().front().toString();
 
     // replace the middle of "won-der-ful" (bar 4) with a single word: both neighbours are repaired

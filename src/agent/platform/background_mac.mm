@@ -31,8 +31,22 @@ bool mu::agent::backgroundModeRequested()
 
 void mu::agent::enterBackgroundMode()
 {
-    // Accessory apps have no Dock icon and are never made frontmost by the system; hiding
+    // Prohibited apps have no Dock icon and cannot be activated at all: an accessory app is
+    // still activated by QWindow::requestActivate (a score opened, a dialog shown), which
+    // flashes its window over the user's and takes them out of a full-screen space. Hiding
     // gives focus back to whatever the user was using.
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
     [NSApp hide:nil];
+
+    // Belt and braces: if anything still activates or unhides the app, hide it again.
+    static bool observing = false;
+    if (!observing) {
+        observing = true;
+        NSNotificationCenter* nc = [NSNotificationCenter defaultCenter];
+        for (NSNotificationName name : { NSApplicationDidBecomeActiveNotification, NSApplicationDidUnhideNotification }) {
+            [nc addObserverForName:name object:NSApp queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification*) {
+                [NSApp hide:nil];
+            }];
+        }
+    }
 }

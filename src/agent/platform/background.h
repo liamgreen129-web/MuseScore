@@ -20,8 +20,9 @@
 
 namespace mu::agent {
 //! MUSESCORE_AGENT_BACKGROUND=1 (set by the test harness): run as a background app that
-//! never takes focus or covers the user's windows. On macOS: accessory activation policy
-//! (no Dock icon, never frontmost) and the app hidden. No-op elsewhere.
+//! never takes focus or covers the user's windows. On macOS: the
+//! "prohibited" activation policy (no Dock icon, never activated or frontmost) and the app
+//! hidden. No-op elsewhere.
 bool backgroundModeRequested();
 void enterBackgroundMode();
 }
