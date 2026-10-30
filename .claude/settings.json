@@ -25,7 +25,14 @@
       "WebFetch",
       "WebSearch",
       "mcp__github",
-      "mcp__claude-code-remote"
+      "mcp__claude-code-remote",
+      "Bash(scripts/*)",
+      "Bash(~/.venvs/MuseClaude/bin/python *)",
+      "Bash(tests/agent/*)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(find *)"
     ],
     "ask": [],
     "deny": []

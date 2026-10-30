@@ -2,6 +2,10 @@
 # MuseScore Agent: one-file setup for the Mac mini. AirDrop it over, then double-click it
 # (or run: bash ~/Downloads/setup-mac-mini.command). Safe to run again: every step is skipped
 # when it is already done. At the end it starts Claude Code in the repo with the prompt below.
+# If double-clicking is blocked after AirDrop, run
+#   xattr -d com.apple.quarantine ~/Downloads/setup-mac-mini.command
+# or use the bash form above.
+# The first Claude Code launch needs an interactive login, so run this from Terminal, not SSH.
 set -euo pipefail
 
 REPO_URL="https://github.com/liamgreen129-web/MuseScore.git"
@@ -25,18 +29,22 @@ if ! xcode-select -p >/dev/null 2>&1; then
 fi
 
 say "Homebrew and build tools"
+if [[ -x /opt/homebrew/bin/brew ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
 if ! command -v brew >/dev/null 2>&1; then
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
-brew install cmake ninja wget p7zip ccache
+brew install cmake ninja wget sevenzip ccache python@3.12
 
 say "Qt 6.10.2"
 if [[ ! -x "$QT_DIR/bin/qmake" ]]; then
     mkdir -p "$HOME/Qt/6.10.2"
     tmp="$(mktemp -d)"
     wget -q --show-progress -O "$tmp/qt.7z" "$QT_URL"
-    7z x "$tmp/qt.7z" -o"$QT_DIR" >/dev/null
+    if command -v 7zz >/dev/null 2>&1; then sevenz=7zz; else sevenz=7z; fi
+    "$sevenz" x -y "$tmp/qt.7z" -o"$QT_DIR" >/dev/null
     rm -rf "$tmp"
 fi
 "$QT_DIR/bin/qmake" -query QT_VERSION
@@ -58,6 +66,10 @@ fi
 cd "$REPO_DIR"
 git remote get-url upstream >/dev/null 2>&1 || git remote add upstream https://github.com/musescore/MuseScore.git
 git fetch origin agent/4.7 "$BRANCH"
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "uncommitted changes in $REPO_DIR from a previous run; commit or stash them, then rerun"
+    exit 1
+fi
 git switch "$BRANCH" 2>/dev/null || git switch -c "$BRANCH" --track "origin/$BRANCH"
 git pull --ff-only origin "$BRANCH"
 
@@ -65,12 +77,20 @@ say "Signing identity (asks for your login keychain password)"
 scripts/make-signing-identity.sh
 
 say "Python for the corpus fixtures"
-if [[ ! -x "$HOME/.venvs/MuseClaude/bin/python" ]]; then
-    python3 -m venv "$HOME/.venvs/MuseClaude"
+# music21 is pinned to the version the cloud corpus fixtures were made with (DECISIONS.md).
+VENV="$HOME/.venvs/MuseClaude"
+if [[ -x "$VENV/bin/python" && "$("$VENV/bin/python" --version 2>&1)" != "Python 3.12."* ]]; then
+    rm -rf "$VENV"
 fi
-"$HOME/.venvs/MuseClaude/bin/python" -m pip install -q --upgrade pip music21
+if [[ ! -x "$VENV/bin/python" ]]; then
+    "$(brew --prefix)/bin/python3.12" -m venv "$VENV"
+fi
+"$VENV/bin/python" -m pip install -q --upgrade pip music21==10.5.2
 
 say "Claude Code"
+if [[ -x "$HOME/.local/bin/claude" ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
 if ! command -v claude >/dev/null 2>&1; then
     curl -fsSL https://claude.ai/install.sh | bash
     export PATH="$HOME/.local/bin:$PATH"
@@ -78,4 +98,4 @@ fi
 
 say "Starting Claude Code in $REPO_DIR"
 cd "$REPO_DIR"
-exec claude "$PROMPT"
+exec claude --permission-mode acceptEdits "$PROMPT"
