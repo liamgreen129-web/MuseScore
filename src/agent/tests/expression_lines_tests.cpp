@@ -366,14 +366,14 @@ TEST_F(Agent_ExpressionLines, SlurErrors)
     expectErr(slur(slurArgs(pos(1, 2, 1), pos(1, 2, 2))), AErr::InvalidArg, "different parts");
     expectErr(slur(slurArgs(pos(1, 3, 1), pos(1, 2, 1))), AErr::Range, "before start");
     expectErr(slur(slurArgs(pos(3, 2, 1), pos(3, 3, 1))), AErr::Range, "beats 1, 3");           // half notes on 1 and 3
-    expectErr(slur(slurArgs(pos(99, 1, 1), pos(1, 2, 1))), AErr::Range, "outside bars");
-    expectErr(slur(slurArgs(pos(1, 1, 9), pos(1, 2, 1))), AErr::Range, "outside staves");
-    expectErr(slur(slurArgs(pos(1, 5, 1), pos(1, 2, 1))), AErr::Range, "outside the bar");
+    expectErr(slur(slurArgs(pos(99, 1, 1), pos(1, 2, 1))), AErr::Range, "outside the score");
+    expectErr(slur(slurArgs(pos(1, 1, 9), pos(1, 2, 1))), AErr::Range, "is outside 1-");
+    expectErr(slur(slurArgs(pos(1, 5, 1), pos(1, 2, 1))), AErr::Range, "past its end");
     expectErr(slur(slurArgs(pos(1, 1, 1, 5), pos(1, 2, 1))), AErr::InvalidArg, "voice");
     expectErr(slur(slurArgs(partPos(1, 1, "Oboe"), pos(1, 2, 1))), AErr::Range, "no part named");
     expectErr(slur(slurArgs(partPos(1, 1, "Flute", 2), pos(1, 2, 1))), AErr::Range, "index 2");
     expectErr(slur(slurArgs(with(pos(1, 1, 1), "bar", Val(1.0)), pos(1, 2, 1))), AErr::InvalidArg, "unknown key");
-    expectErr(slur(slurArgs(with(pos(1, 1, 1), "tick", Val(0.0)), pos(1, 2, 1))), AErr::InvalidArg, "beat or tick");
+    expectErr(slur(slurArgs(with(pos(1, 1, 1), "tick", Val(0.0)), pos(1, 2, 1))), AErr::InvalidArg, "one of beat");
     expectErr(slur(slurArgs(with(pos(1, 1, 1), "handle", Val("x")), pos(1, 2, 1))), AErr::InvalidArg, "not both");
     expectErr(slur(slurArgs(handleAddr("Chord:nonsense"), pos(1, 2, 1))), AErr::InvalidArg, "malformed handle");
     expectErr(slur(slurArgs(Val("m1"), pos(1, 2, 1))), AErr::InvalidArg, "must be an object");
@@ -612,7 +612,7 @@ TEST_F(Agent_ExpressionLines, LineErrors)
 
     expectErr(line(lineArgs("pedal", pos(1, 1, 1), pos(1, 3, 2))), AErr::InvalidArg, "different staves");
     expectErr(line(lineArgs("pedal", pos(2, 1, 2), pos(1, 1, 2))), AErr::Range, "before start");
-    expectErr(line(lineArgs("pedal", pos(2, 2, 2), pos(2, 3, 2))), AErr::Range, "no chord or rest");
+    expectErr(line(lineArgs("pedal", pos(2, 2, 2), pos(2, 3, 2))), AErr::Range, "no note or rest");
     expectErr(line(lineArgs("glissando", pos(1, 1, 1), pos(1, 2, 1))), AErr::InvalidArg, "kind");
     {
         Params p = lineArgs("pedal", pos(1, 1, 1), pos(1, 2, 1));
@@ -746,15 +746,15 @@ TEST_F(Agent_ExpressionLines, MalformedAddressesAreRefused)
         ValMap staff;
         staff["part"] = Val("Flute");
         staff["number"] = Val(1.0);
-        expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "unknown key 'number'");
+        expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "not both"); // shared shape: number, or part (+ index)
         staff.erase("number");
         staff["index"] = Val(1.5);
         expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "index must be a whole number");
         staff.erase("index");
         staff["part"] = Val(2.0);
-        expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "staff.part");
+        expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(staff)), ok)), AErr::InvalidArg, "staff must be");
     }
-    expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(1.5)), ok)), AErr::InvalidArg, "whole staff number");
+    expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(1.5)), ok)), AErr::InvalidArg, "must be a whole number");
     expectErr(slur(slurArgs(with(pos(1, 2, 1), "staff", Val(true)), ok)), AErr::InvalidArg, "staff must be");
     expectErr(slur(slurArgs(with(pos(1, 2, 1), "beat", Val("two")), ok)), AErr::InvalidArg, "beat must be a number");
     {

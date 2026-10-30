@@ -73,7 +73,7 @@ target_sources(agent_lines PRIVATE
     commands/expression-lines/lineops.h
 )
 target_include_directories(agent_lines PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(agent_lines PUBLIC agent_core agent_read engraving)
+target_link_libraries(agent_lines PUBLIC agent_address agent_core agent_read engraving)
 
 # Expression marks (P2.4): the six write operations, engraving only, so they are unit-tested
 # without the app. Registration (register.cpp) stays in the agent module.
@@ -83,7 +83,7 @@ target_sources(agent_marks PRIVATE
     commands/expression-marks/expressionmarks.h
 )
 target_include_directories(agent_marks PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(agent_marks PUBLIC agent_core agent_read engraving)
+target_link_libraries(agent_marks PUBLIC agent_address agent_core agent_read engraving)
 
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 

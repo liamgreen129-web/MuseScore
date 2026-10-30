@@ -309,7 +309,7 @@ TEST_F(Agent_ExpressionMarks, StaffErrors)
     Params noStaff = base;
     noStaff.erase("staff");
     refused(DYN, noStaff, AErr::InvalidArg, "staff");
-    refused(DYN, with(base, "staff", Val(1)), AErr::InvalidArg, "object");
+    refused(DYN, with(base, "staff", Val(1.5)), AErr::InvalidArg, "whole number");
     ValMap junk;
     junk["name"] = Val("x");
     refused(DYN, with(base, "staff", Val(junk)), AErr::InvalidArg, "unknown key");
@@ -330,6 +330,8 @@ TEST_F(Agent_ExpressionMarks, StaffErrors)
     std::string upper = partName;
     std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char ch) { return static_cast<char>(std::toupper(ch)); });
     EXPECT_TRUE(run(DYN, with(base, "staff", staffPart(upper)))) << partName;
+    // a bare staff number is the shared address shape (address/address.h)
+    EXPECT_TRUE(run(DYN, with(with(base, "staff", Val(1)), "dynamic", Val("f")))) << "staff 1";
 }
 
 TEST_F(Agent_ExpressionMarks, PositionErrors)

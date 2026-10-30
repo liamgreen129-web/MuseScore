@@ -220,7 +220,7 @@
       },
       "error": "E_RANGE",
       "text": {
-        "contains": "no chord or rest starts at m2 beat 2"
+        "contains": "no note or rest starts at m2 beat 2"
       }
     }
   ],
