@@ -18,13 +18,16 @@
  */
 #include "noteops.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "engraving/dom/chord.h"
 #include "engraving/dom/durationtype.h"
+#include "engraving/dom/input.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
 #include "engraving/dom/note.h"
+#include "engraving/dom/partialtie.h"
 #include "engraving/dom/rest.h"
 #include "engraving/dom/segment.h"
 #include "engraving/dom/staff.h"
@@ -313,5 +316,505 @@ Ret mu::agent::notes::grace(MasterScore* score, const Params& p, Out& out)
     }
     out["handle"] = Val(core::makeHandle(gn));
     printBars(score, chord->measure(), chord->measure(), chord->staffIdx(), written, out);
+    return muse::make_ok();
+}
+
+// --- shared by the edits below
+
+namespace {
+Ret refuseUnsupportedStaff(MasterScore* score, const ChordRest* cr)
+{
+    const Staff* staff = cr->staff();
+    if (staff->isTabStaff(cr->tick()) || staff->isDrumStaff(cr->tick())) {
+        return makeErr(Err::InvalidArg, address::where(score, cr) + " is on a tablature or percussion staff; "
+                       "those are not supported yet (string/fret and drum heads)");
+    }
+    return muse::make_ok();
+}
+
+//! The chords tied through the chord's first note, from the start of the chain: the chain
+//! Score::addNoteToTiedChord walks (edit.cpp:637-677)
+std::vector<Chord*> tieChain(Chord* chord)
+{
+    Note* ref = chord->notes().front();
+    while (ref->tieBack() && !ref->incomingPartialTie() && ref->tieBack()->startNote()) {
+        ref = ref->tieBack()->startNote();
+    }
+    std::vector<Chord*> out { ref->chord() };
+    while (ref->tieFor() && ref->tieFor()->endNote()) {
+        ref = ref->tieFor()->endNote();
+        out.push_back(ref->chord());
+    }
+    return out;
+}
+
+//! `at` naming one note: a note handle, or a chord/target plus `note` (a pitch); a chord of one
+//! note needs no pitch
+Ret resolveNote(MasterScore* score, const Params& p, bool written, Note*& out)
+{
+    out = nullptr;
+    if (address::has(p, "at") && p.at("at").type() == Val::Type::String) {
+        muse::RetVal<EngravingItem*> r = core::resolveHandle(score, p.at("at").toString());
+        if (!r.ret) {
+            return r.ret;
+        }
+        if (r.val->isNote()) {
+            if (address::has(p, "note")) {
+                return makeErr(Err::InvalidArg, "at is a note handle; leave note out (or give the chord's handle and note)");
+            }
+            out = toNote(r.val);
+            return muse::make_ok();
+        }
+    }
+    ChordRest* cr = nullptr;
+    if (Ret r = address::resolveTarget(score, p, "at", cr); !r) {
+        return r;
+    }
+    if (!cr->isChord()) {
+        return makeErr(Err::InvalidArg, address::where(score, cr) + " is a rest; there is no note to remove");
+    }
+    Chord* chord = toChord(cr);
+    if (!address::has(p, "note")) {
+        if (chord->notes().size() != 1) {
+            return makeErr(Err::InvalidArg, address::where(score, cr) + " is a chord of " + std::to_string(chord->notes().size())
+                           + " notes; say which with note (e.g. \"E5\")");
+        }
+        out = chord->notes().front();
+        return muse::make_ok();
+    }
+    const auto want = parsePitch(p.at("note").toString());
+    if (!want) {
+        return makeErr(Err::InvalidArg, "note must be a pitch such as \"E5\", \"F#4\" or \"Bb3\"");
+    }
+    for (Note* n : chord->notes()) {
+        if (printedPitch(n, written) == *want) {
+            out = n;
+            return muse::make_ok();
+        }
+    }
+    std::string have;
+    for (Note* n : chord->notes()) {
+        have += (have.empty() ? "" : ", ") + nt::writePitch(printedPitch(n, written));
+    }
+    return makeErr(Err::InvalidArg, address::where(score, cr) + " has no " + nt::writePitch(*want) + " (it has " + have
+                   + "; spelling counts)");
+}
+
+//! "q.", "e", "h.." -> its value; the notation's own parser on a one-rest line
+std::optional<TDuration> parseDuration(const std::string& text)
+{
+    const nt::ParseResult r = nt::parse("m1 v1 | r:" + text);
+    if (!r.ok() || r.doc.lines.size() != 1) {
+        return std::nullopt;
+    }
+    const nt::VoiceLine* vl = std::get_if<nt::VoiceLine>(&r.doc.lines.front());
+    const nt::Event* e = vl && vl->items.size() == 1 ? std::get_if<nt::Event>(&vl->items.front()) : nullptr;
+    if (!e || e->kind != nt::EventKind::Rest) {
+        return std::nullopt;
+    }
+    static const std::pair<nt::BaseDuration, DurationType> types[] = {
+        { nt::BaseDuration::Breve, DurationType::V_BREVE }, { nt::BaseDuration::Whole, DurationType::V_WHOLE },
+        { nt::BaseDuration::Half, DurationType::V_HALF }, { nt::BaseDuration::Quarter, DurationType::V_QUARTER },
+        { nt::BaseDuration::Eighth, DurationType::V_EIGHTH }, { nt::BaseDuration::Sixteenth, DurationType::V_16TH },
+        { nt::BaseDuration::ThirtySecond, DurationType::V_32ND }, { nt::BaseDuration::SixtyFourth, DurationType::V_64TH },
+        { nt::BaseDuration::OneTwentyEighth, DurationType::V_128TH },
+    };
+    for (const auto& [b, t] : types) {
+        if (b == e->duration.base) {
+            TDuration d(t);
+            d.setDots(e->duration.dots);
+            return d.isValid() ? std::optional<TDuration>(d) : std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+ChordRest* chordRestStarting(MasterScore* score, const Fraction& tick, track_idx_t track)
+{
+    Segment* seg = score->tick2segment(tick, true, SegmentType::ChordRest);
+    EngravingItem* e = seg && seg->tick() == tick ? seg->element(track) : nullptr;
+    return e && e->isChordRest() ? toChordRest(e) : nullptr;
+}
+}
+
+// --- add_note_to_chord
+
+Ret mu::agent::notes::addNoteToChord(MasterScore* score, const Params& p, Out& out)
+{
+    ChordRest* cr = nullptr;
+    if (Ret r = address::resolveTarget(score, p, "at", cr); !r) {
+        return r;
+    }
+    if (!cr->isChord()) {
+        return makeErr(Err::InvalidArg, address::where(score, cr) + " is a rest; write a note there first (write_voice)");
+    }
+    Chord* chord = toChord(cr);
+    if (chord->isTrillCueNote()) {
+        return makeErr(Err::Range, address::where(score, cr) + " is a trill's cue note, which MuseScore does not let you edit");
+    }
+    if (Ret r = refuseUnsupportedStaff(score, cr); !r) {
+        return r;
+    }
+    const auto pitch = parsePitch(str(p, "note"));
+    if (!pitch) {
+        return makeErr(Err::InvalidArg, "note must be a pitch such as \"E5\", \"F#4\" or \"Bb3\"");
+    }
+    const bool written = writtenMode(p);
+    const Stored s = storePitch(chord->staff(), *pitch, chord->tick(), written);
+    if (s.pitch < 0 || s.pitch > 127) {
+        return makeErr(Err::InvalidArg, nt::writePitch(*pitch) + " is outside MIDI pitches 0-127");
+    }
+    const bool extend = address::has(p, "extendThroughTies") ? p.at("extendThroughTies").toBool() : true;
+    const bool force = address::has(p, "forceAccidental") && p.at("forceAccidental").toBool();
+    const std::vector<Chord*> chain = extend ? tieChain(chord) : std::vector<Chord*> { chord };
+    for (const Chord* c : chain) {
+        // Score::addNote does not check (edit.cpp:586-596); the note-input path would remove it instead
+        if (const Note* dup = c->findNote(s.pitch)) {
+            return makeErr(Err::Exists, address::where(score, c) + " already has " + nt::writePitch(printedPitch(dup, written))
+                           + (c == chord ? "" : " (a chord tied to the target; extendThroughTies false adds to the target only)"));
+        }
+    }
+    std::vector<size_t> before;
+    for (const Chord* c : chain) {
+        before.push_back(c->notes().size());
+    }
+
+    NoteVal nv(s.pitch);
+    // one spelling given, the other derived by Note::setNval, as write_voice does
+    if (written) {
+        nv.tpc2 = s.tpc2;
+    } else {
+        nv.tpc1 = s.tpc1;
+    }
+    if (chain.size() > 1) {
+        // adds to every chord of the chain and ties the new notes (edit.cpp:632-697); it selects
+        // and moves the input state, which the transaction's SelectionGuard puts back
+        score->addNoteToTiedChord(chord, nv, force);
+    } else {
+        InputState is; // private: Score::addNote then leaves the selection and the user's input position alone
+        score->addNote(chord, nv, force, {}, &is);
+    }
+
+    Note* prev = nullptr;
+    for (size_t i = 0; i < chain.size(); ++i) {
+        Note* n = chain[i]->findNote(s.pitch);
+        if (!n || chain[i]->notes().size() != before[i] + 1 || !(printedPitch(n, written) == *pitch)) {
+            return makeErr(Err::PostCondition, "the note was not added as asked at " + address::where(score, chain[i])
+                           + "; nothing was changed");
+        }
+        if (prev && (!prev->tieFor() || prev->tieFor()->endNote() != n)) {
+            return makeErr(Err::PostCondition, "the added notes are not tied through the chain; nothing was changed");
+        }
+        prev = n;
+    }
+    out["handle"] = Val(core::makeHandle(chord->findNote(s.pitch)));
+    out["chords"] = Val(static_cast<int>(chain.size()));
+    printBars(score, chain.front()->measure(), chain.back()->measure(), chord->staffIdx(), written, out);
+    return muse::make_ok();
+}
+
+// --- remove_note
+
+Ret mu::agent::notes::removeNote(MasterScore* score, const Params& p, Out& out)
+{
+    const bool written = writtenMode(p);
+    Note* note = nullptr;
+    if (Ret r = resolveNote(score, p, written, note); !r) {
+        return r;
+    }
+    Chord* chord = note->chord();
+    const std::string name = nt::writePitch(printedPitch(note, written)) + " at " + address::where(score, chord);
+    if (note->generated()) {
+        return makeErr(Err::InvalidArg, name + " is generated by MuseScore and cannot be removed");
+    }
+    if (chord->isTrillCueNote()) {
+        return makeErr(Err::Range, name + " is a trill's cue note, which MuseScore does not let you edit");
+    }
+    if (Ret r = refuseUnsupportedStaff(score, chord); !r) {
+        return r;
+    }
+    const std::string whenLast = str(p, "whenLastNote", "rest");
+    if (whenLast != "rest" && whenLast != "error") {
+        return makeErr(Err::InvalidArg, "whenLastNote must be rest or error");
+    }
+    const bool last = chord->notes().size() == 1;
+    if (last && whenLast == "error") {
+        return makeErr(Err::InvalidArg, name + " is the only note of its chord (whenLastNote is error)");
+    }
+
+    const bool grace = chord->isGrace();
+    Chord* mainChord = grace ? toChord(chord->explicitParent()) : nullptr;
+    const Fraction tick = chord->tick();
+    const Fraction ticks = chord->ticks();
+    const track_idx_t track = chord->track();
+    const Tuplet* tuplet = chord->tuplet();
+    Measure* m = chord->measure();
+    Note* tiedFrom = note->tieBack() ? note->tieBack()->startNote() : nullptr;
+
+    // the Delete key's call for one selected note (Score::cmdDeleteSelection -> deleteItem,
+    // edit.cpp:2821-2869): a note of a chord goes; the last note leaves a rest (a grace chord, nothing)
+    score->deleteItem(note);
+
+    if (tiedFrom && tiedFrom->tieFor() && tiedFrom->tieFor()->endNote() == note) {
+        return makeErr(Err::PostCondition, "the tie into " + name + " was left behind; nothing was changed");
+    }
+    if (!last) {
+        const auto& ns = chord->notes();
+        if (std::find(ns.begin(), ns.end(), note) != ns.end()) {
+            return makeErr(Err::PostCondition, name + " is still in its chord; nothing was changed");
+        }
+        out["handle"] = Val(core::makeHandle(chord));
+    } else if (grace) {
+        const auto& gs = mainChord->graceNotes();
+        if (std::find(gs.begin(), gs.end(), chord) != gs.end()) {
+            return makeErr(Err::PostCondition, "the grace note " + name + " is still there; nothing was changed");
+        }
+        out["handle"] = Val(core::makeHandle(mainChord));
+    } else {
+        ChordRest* now = chordRestStarting(score, tick, track);
+        if (!now || !now->isRest() || now->ticks() != ticks || now->tuplet() != tuplet) {
+            return makeErr(Err::PostCondition, "no rest of the same length took the place of " + name + "; nothing was changed");
+        }
+        out["handle"] = Val(core::makeHandle(now));
+    }
+    out["leftRest"] = Val(last && !grace);
+    printBars(score, m, m, track2staff(track), written, out);
+    return muse::make_ok();
+}
+
+// --- set_duration
+
+Ret mu::agent::notes::setDuration(MasterScore* score, const Params& p, Out& out)
+{
+    ChordRest* cr = nullptr;
+    if (Ret r = address::resolveTarget(score, p, "at", cr); !r) {
+        return r;
+    }
+    if (cr->isMeasureRepeat()) {
+        return makeErr(Err::InvalidArg, address::where(score, cr) + " is a measure repeat; write the bar out first");
+    }
+    if (cr->isChord() && toChord(cr)->isTrillCueNote()) {
+        return makeErr(Err::Range, address::where(score, cr) + " is a trill's cue note, which MuseScore does not let you edit");
+    }
+    const std::string dtext = str(p, "duration");
+    const auto d = parseDuration(dtext);
+    if (!d) {
+        return makeErr(Err::InvalidArg, "duration must be a note value in the compact notation, e.g. \"q\", \"q.\", \"e\", \"h..\"");
+    }
+    const bool allowOverwrite = address::has(p, "allowOverwrite") && p.at("allowOverwrite").toBool();
+    const bool written = writtenMode(p);
+    const std::string here = address::where(score, cr);
+    Measure* m = cr->measure();
+    const staff_idx_t staff = cr->staffIdx();
+
+    if (cr->isGrace()) {
+        // padToggle's grace branch (score.cpp:3238-3246): only the written value changes
+        Chord* g = toChord(cr);
+        score->undoChangeChordRestLen(g, *d);
+        if (g->durationType() != *d) {
+            return makeErr(Err::PostCondition, "the grace note's value did not change; nothing was changed");
+        }
+        out["handle"] = Val(core::makeHandle(g));
+        printBars(score, m, m, staff, written, out);
+        return muse::make_ok();
+    }
+
+    const Fraction tick = cr->tick();
+    const track_idx_t track = cr->track();
+    Tuplet* tuplet = cr->tuplet();
+    const Fraction stretch = cr->staff()->timeStretch(tick);
+    const Fraction oldEnd = cr->endTick();
+    const Fraction newEnd = tick + actualTicks(d->fraction(), tuplet, stretch);
+    const bool wasChord = cr->isChord();
+
+    if (newEnd > oldEnd) {
+        if (tuplet && newEnd > tuplet->tick() + tuplet->actualTicks()) {
+            return makeErr(Err::Range, here + " is in a tuplet; it can grow only to the tuplet's end ("
+                           + address::beatOf(tuplet->measure(), tuplet->tick() + tuplet->actualTicks()) + ")");
+        }
+        if (newEnd > score->endTick()) {
+            return makeErr(Err::Range, "a " + dtext + " at " + here + " would run past the end of the score");
+        }
+        // what the longer value covers (changeCRlen's makeGap, cmd.cpp:1788)
+        std::string notesCovered;
+        for (Segment* s = cr->segment()->next1(SegmentType::ChordRest); s && s->tick() < newEnd; s = s->next1(SegmentType::ChordRest)) {
+            EngravingItem* e = s->element(track);
+            if (!e || !e->isChordRest()) {
+                continue;
+            }
+            ChordRest* next = toChordRest(e);
+            if (!tuplet) {
+                for (Tuplet* t = next->tuplet(); t; t = t->tuplet()) {
+                    if (t->tick() + t->actualTicks() > newEnd) {
+                        return makeErr(Err::InvalidArg, "a " + dtext + " at " + here + " would end inside the tuplet at "
+                                       + address::where(score, next) + "; change the tuplet first");
+                    }
+                }
+            }
+            if (next->isChord()) {
+                notesCovered += (notesCovered.empty() ? "" : ", ") + address::where(score, next);
+            }
+        }
+        if (!notesCovered.empty() && !allowOverwrite) {
+            return makeErr(Err::InvalidArg, "a " + dtext + " at " + here + " would overwrite the notes at " + notesCovered
+                           + "; set allowOverwrite to replace them");
+        }
+    }
+
+    // the duration key on a selected note or rest: Score::padToggle -> changeCRlen (score.cpp:3244)
+    score->changeCRlen(cr, *d); // cr may be replaced; not used again
+
+    ChordRest* now = chordRestStarting(score, tick, track);
+    if (!now || now->isChord() != wasChord) {
+        return makeErr(Err::PostCondition, "nothing of that kind starts at the old place any more; nothing was changed");
+    }
+    const Measure* lastBar = m;
+    if (newEnd <= m->endTick()) {
+        if (now->durationType() != *d || now->endTick() != newEnd) {
+            return makeErr(Err::PostCondition, "the new value is not " + dtext + "; nothing was changed");
+        }
+    } else {
+        // across the bar line: MuseScore splits it into tied notes (or rests) that add up (cmd.cpp:1810-1851)
+        if (newEnd < score->endTick() && !chordRestStarting(score, newEnd, track)) {
+            return makeErr(Err::PostCondition, "nothing starts where the new value ends; nothing was changed");
+        }
+        lastBar = score->tick2measure(newEnd - Fraction::fromTicks(1));
+    }
+    out["handle"] = Val(core::makeHandle(now));
+    printBars(score, m, lastBar, staff, written, out);
+    return muse::make_ok();
+}
+
+// --- exchange_voices
+
+namespace {
+//! The chords of a voice in a bar, as (tick, pitches): what has to swap
+using VoiceContent = std::vector<std::pair<Fraction, std::vector<int> > >;
+
+VoiceContent chordsOf(const Measure* m, track_idx_t track)
+{
+    VoiceContent out;
+    for (const Segment* s = m->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+        const EngravingItem* e = s->element(track);
+        if (e && e->isChord()) {
+            std::vector<int> pitches;
+            for (const Note* n : toChord(e)->notes()) {
+                pitches.push_back(n->pitch());
+            }
+            out.push_back({ s->tick(), pitches });
+        }
+    }
+    return out;
+}
+
+Ret wholeNumber(const Params& p, const char* key, int lo, int hi, int& out)
+{
+    if (!address::has(p, key)) {
+        return makeErr(Err::InvalidArg, std::string("missing ") + key);
+    }
+    const double v = p.at(key).toDouble();
+    if (v != static_cast<int>(v)) {
+        return makeErr(Err::InvalidArg, std::string(key) + " must be a whole number");
+    }
+    out = static_cast<int>(v);
+    if (out < lo || out > hi) {
+        return makeErr(Err::Range, std::string(key) + " " + std::to_string(out) + " is outside " + std::to_string(lo) + "-"
+                       + std::to_string(hi));
+    }
+    return muse::make_ok();
+}
+}
+
+Ret mu::agent::notes::exchangeVoices(MasterScore* score, const Params& p, Out& out)
+{
+    if (!address::has(p, "staves") || p.at("staves").type() != Val::Type::List || p.at("staves").toList().empty()) {
+        return makeErr(Err::InvalidArg, "staves must list at least one staff");
+    }
+    std::vector<staff_idx_t> staves;
+    for (const Val& v : p.at("staves").toList()) {
+        staff_idx_t si = 0;
+        if (Ret r = address::resolveStaff(score, v, si); !r) {
+            return r;
+        }
+        staves.push_back(si);
+    }
+    std::sort(staves.begin(), staves.end());
+    staves.erase(std::unique(staves.begin(), staves.end()), staves.end());
+    for (size_t i = 1; i < staves.size(); ++i) {
+        if (staves[i] != staves[i - 1] + 1) {
+            return makeErr(Err::Range, "staves must be next to each other (a range selection), e.g. [2, 3, 4]");
+        }
+    }
+    const std::vector<Measure*> bars = address::allMeasures(score);
+    const int nbars = static_cast<int>(bars.size());
+    int from = 0;
+    int to = 0;
+    int a = 0;
+    int b = 0;
+    if (Ret r = wholeNumber(p, "fromMeasure", 1, nbars, from); !r) {
+        return r;
+    }
+    if (Ret r = wholeNumber(p, "toMeasure", 1, nbars, to); !r) {
+        return r;
+    }
+    if (to < from) {
+        return makeErr(Err::Range, "toMeasure " + std::to_string(to) + " is before fromMeasure " + std::to_string(from));
+    }
+    if (Ret r = wholeNumber(p, "voiceA", 1, 4, a); !r) {
+        return r;
+    }
+    if (Ret r = wholeNumber(p, "voiceB", 1, 4, b); !r) {
+        return r;
+    }
+    if (a == b) {
+        return makeErr(Err::Range, "voiceA and voiceB are both " + std::to_string(a) + "; give two different voices");
+    }
+    for (int i = from; i <= to; ++i) {
+        for (staff_idx_t si : staves) {
+            for (const Segment* s = bars[i - 1]->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
+                const EngravingItem* e = s->element(si * VOICES);
+                if (e && e->isMeasureRepeat()) {
+                    return makeErr(Err::InvalidArg, "m" + std::to_string(i) + " of staff " + std::to_string(si + 1)
+                                   + " is a measure repeat; write the bar out first");
+                }
+            }
+        }
+    }
+
+    const voice_idx_t va = static_cast<voice_idx_t>(a - 1);
+    const voice_idx_t vb = static_cast<voice_idx_t>(b - 1);
+    std::vector<std::pair<VoiceContent, VoiceContent> > before;
+    for (int i = from; i <= to; ++i) {
+        for (staff_idx_t si : staves) {
+            before.push_back({ chordsOf(bars[i - 1], si * VOICES + va), chordsOf(bars[i - 1], si * VOICES + vb) });
+        }
+    }
+
+    // Score::cmdExchangeVoice's loop (edit.cpp:4571-4577) over the bars, without its range
+    // selection: the master score, so linked staves and parts follow (edit.cpp:6364-6424)
+    for (int i = from; i <= to; ++i) {
+        score->undoExchangeVoice(bars[i - 1], va, vb, staves.front(), staves.back() + 1);
+    }
+
+    size_t k = 0;
+    for (int i = from; i <= to; ++i) {
+        for (staff_idx_t si : staves) {
+            const auto& [wasA, wasB] = before[k++];
+            if (chordsOf(bars[i - 1], si * VOICES + va) != wasB || chordsOf(bars[i - 1], si * VOICES + vb) != wasA) {
+                return makeErr(Err::PostCondition, "voices " + std::to_string(a) + " and " + std::to_string(b) + " of m"
+                               + std::to_string(i) + ", staff " + std::to_string(si + 1) + " did not swap; nothing was changed");
+            }
+        }
+    }
+
+    read::ReadOptions opt;
+    opt.fromBar = from;
+    opt.toBar = to;
+    for (staff_idx_t si : staves) {
+        opt.staves.push_back(static_cast<int>(si) + 1);
+    }
+    opt.writtenPitch = writtenMode(p);
+    out["text"] = Val(nt::write(read::printScore(score, opt)));
+    out["bars"] = Val(from == to ? std::to_string(from) : std::to_string(from) + "-" + std::to_string(to));
     return muse::make_ok();
 }

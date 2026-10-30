@@ -1,0 +1,56 @@
+{
+  "id": "N03",
+  "title": "add_note_to_chord, remove_note and set_duration on existing notes; each undo and redo round-trips",
+  "source": "specs/notes.md NOTES-ANC-01..04, NOTES-RN-01..03, NOTES-SD-01..04",
+  "fixture": "synthetic/pickup-bar.mscz",
+  "specs": ["specs/notes.md add_note_to_chord, remove_note, set_duration"],
+  "steps": [
+    {"tool": "write_voice", "writes": true, "args": {"staff": 1, "content": "m2 v1 | E4:h D4:q\nm3 v1 | C5:h~ C5:q~\nm4 v1 | C5:h.\nm5 v1 | C5:q D5:e E5:e F5:q\nm6 v1 | {3:2 C5:e D5:e E5:e} F5:h"}},
+    {
+      "tool": "add_note_to_chord", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 2, "beat": 1}, "note": "G4"},
+      "expect": {"text": {"contains": "m2(1) v1 | [E4,G4]:h D4:q"}, "handle": {"startswith": "Note:"}}
+    },
+    {
+      "tool": "add_note_to_chord", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 3, "beat": 3}, "note": "E5"},
+      "expect": {"text": {"all": [{"contains": "m3(2) v1 | [C5,E5]:h~ [C5,E5]:q~"}, {"contains": "m4(3) v1 | [C5,E5]:h."}]}},
+      "note": "every chord of the tie chain gets the note, tied through"
+    },
+    {"tool": "add_note_to_chord", "args": {"at": {"staff": 1, "measure": 2, "beat": 1}, "note": "Fb4"}, "error": "E_EXISTS"},
+    {"tool": "$undo"},
+    {"tool": "$redo"},
+    {
+      "tool": "remove_note", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 2, "beat": 1}, "note": "E4"},
+      "expect": {"text": {"contains": "m2(1) v1 | G4:h D4:q"}}
+    },
+    {
+      "tool": "remove_note", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 6, "offset": "1/12"}},
+      "expect": {"text": {"contains": "m6(5) v1 | {3:2 C5:e r:e E5:e} F5:h"}, "handle": {"startswith": "Rest:"}},
+      "note": "the only note of a chord inside a triplet leaves a rest in the triplet"
+    },
+    {"tool": "remove_note", "args": {"at": {"staff": 1, "measure": 2, "beat": 3}, "whenLastNote": "error"}, "error": "E_INVALID_ARG"},
+    {"tool": "$undo"},
+    {"tool": "$redo"},
+    {"tool": "set_duration", "args": {"at": {"staff": 1, "measure": 5, "beat": 1}, "duration": "q."}, "error": "E_INVALID_ARG", "text": {"contains": "allowOverwrite"}},
+    {
+      "tool": "set_duration", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 5, "beat": 1}, "duration": "q.", "allowOverwrite": true},
+      "expect": {"text": {"contains": "m5(4) v1 | C5:q. E5:e F5:q"}}
+    },
+    {
+      "tool": "set_duration", "writes": true,
+      "args": {"at": {"staff": 1, "measure": 5, "beat": 3}, "duration": "h", "allowOverwrite": true},
+      "expect": {"text": {"all": [{"contains": "m5(4) v1 | C5:q. E5:e F5:q~"}, {"contains": "m6(5) v1 | F5:q"}]}},
+      "note": "across the bar line: tied notes that add up; the triplet in m6 is replaced"
+    },
+    {"tool": "set_duration", "args": {"at": {"staff": 1, "measure": 2, "beat": 1}, "duration": "x"}, "error": "E_INVALID_ARG"},
+    {"tool": "$undo"},
+    {"tool": "$redo"},
+    {"assert": "undoIndex", "delta": 7}
+  ],
+  "goldens": [{"format": "musicxml", "path": "goldens/N03_chord_notes_and_durations.musicxml"}],
+  "invariants": {"validate": true, "undoRedo": true}
+}
