@@ -1,0 +1,154 @@
+{
+  "id": "PT02",
+  "title": "set_pitch on transposing instruments: written and sounding, refusals",
+  "source": "P2.4 pitch (PITCH-05, PITCH-06)",
+  "fixture": "synthetic/transposing-instruments.mscz",
+  "specs": [
+    "specs/pitch.md set_pitch"
+  ],
+  "steps": [
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "number": 2
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "E4",
+        "space": "written"
+      },
+      "expect": {
+        "pitch": "D4",
+        "writtenPitch": "E4"
+      },
+      "note": "Bb trumpet: written E4 sounds D4"
+    },
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "number": 2
+        },
+        "at": {
+          "measure": 1,
+          "beat": 2
+        },
+        "pitch": "Bb4"
+      },
+      "expect": {
+        "pitch": "Bb4",
+        "writtenPitch": "C5"
+      },
+      "note": "sounding (the default): written C5"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 1,
+        "staves": [
+          2
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | D4:q Bb4:q E4:q F4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 1,
+        "staves": [
+          2
+        ],
+        "pitch": "written"
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | E4:q C5:q F#4:q G4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "number": 2
+        },
+        "at": {
+          "measure": 1,
+          "beat": 3
+        },
+        "midi": 68,
+        "space": "written"
+      },
+      "expect": {
+        "writtenPitch": "G#4",
+        "pitch": "F#4"
+      },
+      "note": "written MIDI 68 spelled in the written key (D major): G#4"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 2
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "Cbb5",
+        "space": "written"
+      },
+      "error": "E_INVALID_ARG",
+      "note": "would sound B-triple-flat"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 5
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "C-1",
+        "space": "written"
+      },
+      "error": "E_INVALID_ARG",
+      "note": "tenor sax sounds a ninth lower: below MIDI 0"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/PT02_set_pitch_transposing.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Golden not produced yet (no build in the cloud session): run --update-goldens on the Mac and review."
+  ]
+}

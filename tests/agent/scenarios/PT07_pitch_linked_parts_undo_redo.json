@@ -1,0 +1,226 @@
+{
+  "id": "PT07",
+  "title": "transpose and set_pitch in linked parts: undo and redo singly and as one batch",
+  "source": "P2.4 pitch (TRN-12, PITCH-14)",
+  "fixture": "synthetic/parts-linked.mscz",
+  "specs": [
+    "specs/pitch.md transpose",
+    "specs/pitch.md set_pitch"
+  ],
+  "requires": [
+    "undo",
+    "redo"
+  ],
+  "steps": [
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": {
+          "start": {
+            "measure": 1
+          },
+          "end": {
+            "measure": 1
+          },
+          "staves": [
+            {
+              "part": "Flute",
+              "index": 1
+            }
+          ]
+        },
+        "by": {
+          "interval": "M2",
+          "direction": "up"
+        },
+        "key_signatures": false
+      },
+      "expect": {
+        "notation": {
+          "contains": "F#5:q+mf G5:q A5:q B5:q"
+        }
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "0_Flute\\.mscx$",
+      "text": {
+        "contains": "<pitch>83</pitch>"
+      },
+      "note": "B5 reached the Flute part"
+    },
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": {
+          "start": {
+            "measure": 1
+          },
+          "end": {
+            "measure": 1
+          },
+          "staves": [
+            {
+              "number": 2
+            }
+          ]
+        },
+        "by": {
+          "interval": "M2",
+          "direction": "up"
+        }
+      },
+      "note": "the Bb clarinet's bar 1 and its key signature (the range starts at the bar start)"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 1,
+        "staves": [
+          2
+        ],
+        "pitch": "written"
+      },
+      "expect": {
+        "text": {
+          "contains": "m1 v1 | r:q G#5:q B5:q r:q"
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "batch",
+      "writes": true,
+      "args": {
+        "name": "Pitch edits",
+        "operations": [
+          {
+            "command": "set_pitch",
+            "args": {
+              "staff": {
+                "number": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 4
+              },
+              "pitch": "E5"
+            }
+          },
+          {
+            "command": "set_pitch",
+            "args": {
+              "staff": {
+                "number": 1
+              },
+              "at": {
+                "measure": 3,
+                "beat": 1
+              },
+              "pitch": "F5"
+            }
+          },
+          {
+            "command": "transpose",
+            "args": {
+              "range": {
+                "start": {
+                  "measure": 4
+                },
+                "end": {
+                  "measure": 4
+                },
+                "staves": [
+                  {
+                    "number": 3
+                  }
+                ]
+              },
+              "by": {
+                "interval": "P8",
+                "direction": "down"
+              }
+            }
+          }
+        ]
+      },
+      "note": "two writes to one tie chain (last wins) and a transpose: one undo entry"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 1
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 2,
+        "to": 4,
+        "staves": [
+          1,
+          3
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "F5:q~"
+            },
+            {
+              "contains": "m3 v1 | F5:h C5:h"
+            },
+            {
+              "contains": "m4 v1 | G1:w"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "mscz",
+      "path": "goldens/PT07_pitch_linked_parts_undo_redo.mscz"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Golden not produced yet (no build in the cloud session): run --update-goldens on the Mac and review."
+  ]
+}

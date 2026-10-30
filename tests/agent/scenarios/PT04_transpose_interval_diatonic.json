@@ -1,0 +1,203 @@
+{
+  "id": "PT04",
+  "title": "transpose by a compound interval and diatonically; refusals",
+  "source": "P2.4 pitch (TRN-04, TRN-06, TRN-08, TRN-16)",
+  "fixture": "synthetic/transposing-instruments.mscz",
+  "specs": [
+    "specs/pitch.md transpose"
+  ],
+  "steps": [
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": {
+          "start": {
+            "measure": 1,
+            "beat": 1
+          },
+          "end": {
+            "measure": 1
+          },
+          "staves": [
+            {
+              "part": "Flute",
+              "index": 1
+            }
+          ]
+        },
+        "by": {
+          "interval": "M3",
+          "direction": "up",
+          "octaves": 1
+        },
+        "key_signatures": false
+      },
+      "expect": {
+        "status": "transposed",
+        "interval": "M3 + 1 octave(s) up",
+        "notes": 4,
+        "notation": {
+          "contains": "m1 v1 | E5:q F#5:q G#5:q A5:q"
+        }
+      },
+      "note": "a major tenth = M3 + an octave, one undo entry"
+    },
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": {
+          "start": {
+            "measure": 3,
+            "beat": 1
+          },
+          "end": {
+            "measure": 3,
+            "beat": 4
+          },
+          "staves": [
+            {
+              "number": 1
+            }
+          ]
+        },
+        "by": {
+          "degrees": 2,
+          "direction": "up"
+        }
+      },
+      "expect": {
+        "notation": {
+          "contains": "m3 v1 | Db5:q A#4:q Gb4:q Cb5:q"
+        }
+      },
+      "note": "up a third in C major, alterations kept"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 4,
+        "staves": [
+          1,
+          2
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m2 v1 | G4:q A4:q B4:q C5:q"
+            },
+            {
+              "contains": "m3 v1 | Bb4:q F#4:q Eb4:q Ab4:q"
+            }
+          ]
+        }
+      },
+      "note": "bar 2 of the flute and the trumpet are untouched"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "start": {
+            "measure": 1
+          },
+          "end": {
+            "measure": 1
+          }
+        },
+        "by": {
+          "interval": "M10",
+          "direction": "up"
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "compound intervals are interval + octaves"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "start": {
+            "measure": 1,
+            "beat": 1.5
+          },
+          "end": {
+            "measure": 1
+          }
+        },
+        "by": {
+          "interval": "M2",
+          "direction": "up"
+        }
+      },
+      "error": "E_RANGE",
+      "note": "no note or rest starts at the range start"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "start": {
+            "measure": 2,
+            "beat": 3
+          },
+          "end": {
+            "measure": 2,
+            "beat": 1
+          }
+        },
+        "by": {
+          "interval": "M2",
+          "direction": "up"
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "end before start"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "score": true
+        },
+        "by": {
+          "degrees": 2,
+          "direction": "up"
+        },
+        "key_signatures": true
+      },
+      "error": "E_INVALID_ARG",
+      "note": "key_signatures goes with interval and key"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "score": true
+        },
+        "by": {
+          "interval": "M2"
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "direction is required for an interval"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/PT04_transpose_interval_diatonic.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Golden not produced yet (no build in the cloud session): run --update-goldens on the Mac and review."
+  ]
+}

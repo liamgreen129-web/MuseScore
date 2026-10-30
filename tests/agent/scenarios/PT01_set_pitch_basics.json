@@ -1,0 +1,253 @@
+{
+  "id": "PT01",
+  "title": "set_pitch: spelled, respelled, MIDI with spelling; refusals leave the score alone",
+  "source": "P2.4 pitch (PITCH-01, PITCH-02, PITCH-12)",
+  "fixture": "synthetic/transposing-instruments.mscz",
+  "specs": [
+    "specs/pitch.md set_pitch"
+  ],
+  "steps": [
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "F#4"
+      },
+      "expect": {
+        "status": "changed",
+        "pitch": "F#4",
+        "tiedNotes": 1,
+        "notation": {
+          "contains": "m1 v1 | F#4:q D4:q E4:q F4:q"
+        }
+      },
+      "note": "C4 -> F#4 in C major: pitch 66, both spellings F#"
+    },
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "Gb4"
+      },
+      "expect": {
+        "status": "changed",
+        "notation": {
+          "contains": "m1 v1 | Gb4:q D4:q"
+        }
+      },
+      "note": "same key, other spelling: one more undo entry"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "Gb4"
+      },
+      "expect": {
+        "status": "unchanged",
+        "changed": false
+      },
+      "note": "already that pitch and spelling: no undo entry"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 2
+    },
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 2
+        },
+        "midi": 68,
+        "spelling": "flats"
+      },
+      "expect": {
+        "pitch": "Ab4"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 1,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | Gb4:q Ab4:q E4:q F4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "H4"
+      },
+      "error": "E_INVALID_ARG",
+      "note": "not a pitch name"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "G#9"
+      },
+      "error": "E_INVALID_ARG",
+      "note": "MIDI 128"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "midi": 128
+      },
+      "error": "E_INVALID_ARG",
+      "note": "above the schema maximum"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "E4",
+        "midi": 64
+      },
+      "error": "E_INVALID_ARG",
+      "note": "pitch and midi together"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "E4",
+        "spelling": "sharps"
+      },
+      "error": "E_INVALID_ARG",
+      "note": "spelling goes with midi only"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1.5
+        },
+        "pitch": "E4"
+      },
+      "error": "E_RANGE",
+      "note": "nothing starts there"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 99
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "E4"
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "number": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "pitch": "E4",
+        "tab": {
+          "string": 0,
+          "fret": 0
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "tab on a standard staff"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/PT01_set_pitch_basics.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Golden not produced yet (no build in the cloud session): run --update-goldens on the Mac and review."
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "id": "PT03",
+  "title": "set_pitch in linked parts, on a chord tone and a tie chain; undo and redo each",
+  "source": "P2.4 pitch (PITCH-03, PITCH-11)",
+  "fixture": "synthetic/parts-linked.mscz",
+  "specs": [
+    "specs/pitch.md set_pitch"
+  ],
+  "requires": [
+    "undo",
+    "redo"
+  ],
+  "steps": [
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 3
+        },
+        "pitch": "Bb5"
+      },
+      "expect": {
+        "notation": {
+          "contains": "F5:q Bb5:q A5:q"
+        }
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "0_Flute\\.mscx$",
+      "text": {
+        "contains": "<pitch>82</pitch>"
+      },
+      "note": "the Flute part's copy follows"
+    },
+    {
+      "tool": "set_pitch",
+      "args": {
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "pitch": "F5"
+      },
+      "error": "E_INVALID_ARG",
+      "note": "a chord of two notes needs note or note_index"
+    },
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 3
+        },
+        "note": "E5",
+        "pitch": "F5"
+      },
+      "expect": {
+        "notation": {
+          "contains": "[C5,F5]:q"
+        }
+      }
+    },
+    {
+      "tool": "set_pitch",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        },
+        "pitch": "Eb5"
+      },
+      "expect": {
+        "tiedNotes": 2,
+        "bars": "m2-m3",
+        "notation": {
+          "all": [
+            {
+              "contains": "Eb5:q~"
+            },
+            {
+              "contains": "m3 v1 | Eb5:h C5:h"
+            }
+          ]
+        }
+      },
+      "note": "the D5 tied from bar 2 changes with it"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 3,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "Bb5:q"
+            },
+            {
+              "contains": "[C5,F5]:q"
+            },
+            {
+              "contains": "m3 v1 | Eb5:h C5:h"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "mscz",
+      "path": "goldens/PT03_set_pitch_linked_parts_undo_redo.mscz"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Golden not produced yet (no build in the cloud session): run --update-goldens on the Mac and review."
+  ]
+}
