@@ -11,7 +11,7 @@
       "tool": "transpose",
       "writes": true,
       "args": {
-        "range": "score",
+        "range": {"score": true},
         "by": {
           "key": -2,
           "direction": "up"
