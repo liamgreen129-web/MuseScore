@@ -121,12 +121,16 @@ bars' notation yet. Once it is fixed, `expect` on that field is shorter.
 | R02 | validate clean, reads incl. a nested tuplet; mscz golden | synthetic/stress-combined | runs today |
 | R03 | whole-score read refused with a range that fits; bad args refused, score untouched | corpus/beethoven-op74 | runs today |
 | S01–S20 | assessment.md Phase 2 list | see each file | SKIP until the tools exist |
+| N01–N04 | notes group: clear_range; tie, tuplet, grace; add_note_to_chord, remove_note, set_duration; exchange_voices with parts | synthetic | N03/N04 unverified (cloud, 2026-10-30) |
+| EL01–EL04, EM01–EM06 | expression lines and marks | synthetic | run on the Mac |
+| TX01–TX07 | text group: staff/system/expression/tempo/rehearsal text, chord symbols, lyrics, parts, batch | synthetic | unverified (cloud, 2026-10-30) |
+| PT01–PT07 | pitch group: set_pitch, transpose (keys, transposing instruments, parts) | synthetic | unverified (cloud, 2026-10-30) |
 
 S17 (concurrent user edit) uses a second agent write as the stand-in for the user. A scenario
 with `"testCommands": true` runs its instance with `MUSESCORE_AGENT_TEST_COMMANDS=1`, which adds
 the `test_*` hooks. S19 (playback) uses `test_dispatch` and plays about a second of audio. S18
-(modal dialog) needs a `test_modal` hook that main does not have yet, so it SKIPs; its `manual`
-field says how to run it by hand meanwhile. S20 checks the linked
+(modal dialog) uses the `test_modal` hook, which opens the framework's test dialog non-modally;
+its `manual` field says how to run it by hand. S20 checks the linked
 parts inside the mscz export, since there is no command to make a part the current view.
 
 ### Address conventions assumed (until the core fixes them)
