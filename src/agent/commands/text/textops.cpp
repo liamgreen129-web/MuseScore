@@ -480,9 +480,10 @@ std::string defaultBeatUnit(MasterScore* score, const Fraction& tick)
     }
 }
 
-//! Does the text carry a metronome mark ("<note> = <number>") that TempoText::updateTempo would
-//! read? The same clean-up as updateTempo (tempotext.cpp:262-270), then its absolute pattern
-//! (note, spaces, "=", spaces, a number; :265-280). Looked at on a probe that is never added to the score.
+//! Does the text carry a metronome mark that TempoText::updateTempo would read: "<note> = <number>"
+//! or a relative "<note> = <note>"? The same clean-up (tempotext.cpp:265-273) and the same note
+//! patterns, tried in its order (tempotext.cpp:113-136, file-static upstream), on a probe that is
+//! never added to the score (updateTempo itself would push undo commands, so it is not called).
 bool hasMetronomeMark(MasterScore* score, const String& xml)
 {
     std::unique_ptr<TempoText> probe(Factory::createTempoText(score->dummy()->segment()));
@@ -490,22 +491,41 @@ bool hasMetronomeMark(MasterScore* score, const String& xml)
     String s = probe->plainText();
     s.replace(u",", u".");
     s.replace(u"<sym>space</sym>", u" ");
-    s.replace(u"\u2252", u"="); // approximately equal to or the image of
-    s.replace(u"\u2248", u"="); // almost equal to
+    s.replace(u"≒", u"="); // approximately equal to or the image of
+    s.replace(u"≈", u"="); // almost equal to
     s.replace(u"~", u"=");
     s.replace(u"ca.", u"");
     s.replace(u"c.", u"");
     s.replace(u"approx.", u"");
-    int len = 0;
-    TDuration d;
-    const int at = TempoText::findTempoDuration(s, len, d); // a byte offset into the UTF-8 text
-    if (at < 0) {
-        return false; // no metronome note
-    }
-    // the note (one SMuFL character, 3 bytes in UTF-8), optional augmentation dots (U+ECB7), then "= <digit>"
-    static const std::regex mark("^[\\s\\S]{3}(\\s*\xEE\xB2\xB7)*\\s*=\\s*[0-9]");
     const std::string u8 = s.toStdString();
-    return std::regex_search(u8.substr(static_cast<size_t>(at)), mark);
+    // the note patterns of TempoText's tp[] table, in its order
+    static const char16_t* const notes[] = {
+        u"\\s*\\s*", u"\\s*", u"",
+        u"\\s*\\s*", u"\\s*", u"",
+        u"\\s*\\s*", u"\\s*", u"",
+        u"\\s*", u"",
+        u"\\s*", u"",
+        u"\\s*", u"",
+        u"", u"", u"", u"", u"", u"", u"",
+    };
+    // compiled once, as updateTempo caches them (std::regex is costly to build)
+    static const std::vector<std::regex> marks = [] {
+        std::vector<std::regex> v;
+        for (const char16_t* a : notes) {
+            const std::string pa = String(a).toStdString();
+            v.emplace_back(pa + "\\s*=\\s*(\\d+[.]{0,1}\\d*)\\s*");
+            for (const char16_t* b : notes) {
+                v.emplace_back(pa + "\\s*=\\s*" + String(b).toStdString() + "\\s*");
+            }
+        }
+        return v;
+    }();
+    for (const std::regex& re : marks) {
+        if (std::regex_search(u8, re)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // ------------------------------------------------------------------ text kinds
@@ -751,6 +771,15 @@ const std::vector<std::string>& mu::agent::text::textKinds()
     return n;
 }
 
+std::string mu::agent::text::beatUnitList()
+{
+    std::string out;
+    for (const std::string& u : beatUnits()) {
+        out += (out.empty() ? "" : ", ") + u;
+    }
+    return out;
+}
+
 const std::vector<std::string>& mu::agent::text::beatUnits()
 {
     static const std::vector<std::string> n = [] {
@@ -836,7 +865,7 @@ Ret mu::agent::text::addText(const Params& p, MasterScore* score, Out& out)
             unitName = t.at("beat_unit").toString();
             const auto& units = beatUnits();
             if (std::find(units.begin(), units.end(), unitName) == units.end()) {
-                return makeErr(Err::InvalidArg, "tempo.beat_unit must be one of w, h., h, q., q, e., e, s., s");
+                return makeErr(Err::InvalidArg, "tempo.beat_unit must be one of " + beatUnitList());
             }
             if (!hasBpm) {
                 return makeErr(Err::InvalidArg, "tempo.beat_unit needs tempo.bpm");
@@ -1094,13 +1123,14 @@ Ret mu::agent::text::addChordSymbol(const Params& p, MasterScore* score, Out& ou
     const String text = normaliseChordText(String::fromStdString(raw).trimmed(), htype);
     Segment* seg = m->findSegment(SegmentType::ChordRest, tick);
     Harmony* existing = seg ? findHarmony(seg, track, htype) : nullptr;
-    if (existing && ifExists == "error") {
-        return makeErr(Err::Exists, place + " already has the chord symbol " + plain(existing->harmonyName()) + " ("
-                       + core::makeHandle(existing) + "); pass if_exists \"replace\" to change it");
-    }
+    // a fret diagram's chord symbol first: if_exists replace would not help there
     if (existing && existing->explicitParent() && existing->explicitParent()->isFretDiagram()) {
         return makeErr(Err::Exists, "the chord symbol at " + place + " belongs to a fret diagram; this command does not "
                        "replace those");
+    }
+    if (existing && ifExists == "error") {
+        return makeErr(Err::Exists, place + " already has the chord symbol " + plain(existing->harmonyName()) + " ("
+                       + core::makeHandle(existing) + "); pass if_exists \"replace\" to change it");
     }
     if (existing) {
         // spec Q6: replace = remove + Recipe B. Unchanged if it would read the same.
@@ -1325,10 +1355,10 @@ Ret mu::agent::text::addLyric(const Params& p, MasterScore* score, Out& out)
             }
             ChordRest* ecr = nullptr;
             if (Ret r = address::chordRestAt(score, mm, t, track, ecr); !r) {
-                const std::string t = r.text();
-                const size_t colon = t.find(": ");
-                return makeErr(Err::InvalidArg, n + ": melisma_to: " + (t.rfind("E_", 0) == 0 && colon != std::string::npos
-                                                                        ? t.substr(colon + 2) : t));
+                const std::string msg = r.text();
+                const size_t colon = msg.find(": ");
+                return makeErr(Err::InvalidArg, n + ": melisma_to: " + (msg.rfind("E_", 0) == 0 && colon != std::string::npos
+                                                                        ? msg.substr(colon + 2) : msg));
             }
             if (!ecr->isChord()) {
                 return makeErr(Err::InvalidArg, n + ": melisma_to (" + address::where(score, ecr) + ") is a rest; an extender "

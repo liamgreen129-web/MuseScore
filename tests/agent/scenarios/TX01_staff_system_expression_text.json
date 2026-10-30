@@ -161,6 +161,38 @@
       "delta": 3
     },
     {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "staff",
+        "staff": 1,
+        "at": {
+          "measure": 4,
+          "beat": 1
+        },
+        "text": "arco"
+      },
+      "expect": {
+        "status": "added"
+      },
+      "note": "a bare staff number (the shared address shape) passes the registry"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "staff",
+        "staff": 1,
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "voice": 5,
+        "text": "solo"
+      },
+      "error": "E_RANGE",
+      "note": "a voice outside 1-4 is E_RANGE from the command (no schema limit), as in the shared address module"
+    },
+    {
       "tool": "score_read",
       "args": {
         "from": 1,

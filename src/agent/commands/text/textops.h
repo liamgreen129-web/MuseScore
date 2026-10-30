@@ -51,7 +51,8 @@ muse::Ret addLyric(const Params& p, mu::engraving::MasterScore* score, Out& out)
 
 //! Allowed values, for the schemas' enums
 const std::vector<std::string>& textKinds();      // staff, system, expression, tempo, rehearsal
-const std::vector<std::string>& beatUnits();      // w, h., h, q., q, e., e, s., s
+const std::vector<std::string>& beatUnits();      // w, h., h, q., q, e., e, s., s, t., t, x, y
+std::string beatUnitList();                       // the same, "w, h., h, ..."
 const std::vector<std::string>& harmonyNotations(); // standard, roman, nashville
 const std::vector<std::string>& syllabicNames();  // single, begin, middle, end
 }

@@ -51,10 +51,8 @@ Arg arg(DataType t, const std::string& d, bool required = false)
 
 Arg voiceArg()
 {
-    Arg a = arg(DataType::Integer, VOICE_DESC);
-    a.min = Val(1);
-    a.max = Val(4);
-    return a;
+    // no schema min/max: a voice outside 1-4 is E_RANGE from the command, as in address/address.h
+    return arg(DataType::Integer, VOICE_DESC);
 }
 
 Arg enumArg(const std::string& d, const std::vector<std::string>& values, bool required = false)
@@ -91,7 +89,8 @@ void mu::agent::registerTextCommands(CommandRegistry& registry)
               "keep MuseScore's default 80 to the beat (reported in messages). Refuses (E_RANGE) when no note or rest "
               "starts exactly there (system kinds use any voice when voice is not given) or the voice is outside 1-4; "
               "with E_INVALID_ARG a measure repeat, empty text, markup outside that subset, kind tempo with neither "
-              "text nor tempo.bpm, a tempo text that already has a metronome mark together with tempo.bpm, and a tempo "
+              "text nor tempo.bpm, tempo given for a kind other than tempo or voice_assignment for a kind other than "
+              "expression, a tempo text that already has a metronome mark together with tempo.bpm, and a tempo "
               "outside 5-999 quarter notes a minute (after beat_unit); with E_EXISTS a second tempo marking or "
               "rehearsal mark at the same place, or the same text twice there. Returns the handle, where it went, and the bar's notation (staff text "
               "shows as +\"pizz.\", system text +sys\"...\", expression +exp\"...\", tempo +tempo\"...\"(q=N), "
@@ -106,9 +105,10 @@ void mu::agent::registerTextCommands(CommandRegistry& registry)
         c.input["text"] = arg(DataType::String, "The text, plain (escaped for you)");
         c.input["xml"] = arg(DataType::String, "Instead of text: MuseScore text markup, e.g. \"<sym>metNoteQuarterUp</sym> = 60\" "
                                                "or \"<i>dolce</i>\"");
-        c.input["tempo"] = arg(DataType::Object, "kind tempo only: {\"bpm\": <number>, \"beat_unit\": \"w\"|\"h.\"|\"h\"|\"q.\"|\"q\"|"
-                                                 "\"e.\"|\"e\"|\"s.\"|\"s\" (default: the beat of the time signature, as "
-                                                 "MuseScore's default marking: q, or q. in 6/8), \"follow_text\": <bool>}");
+        c.input["tempo"] = arg(DataType::Object, std::string("kind tempo only: {\"bpm\": <number>, \"beat_unit\": one of ") + tx::beatUnitList()
+                                                 + " (default: the beat of the time signature, as MuseScore's default "
+                                                 "marking: q, q. in 6/8, e in 3/8, s or t in /16 and /32 metres), "
+                                                 "\"follow_text\": <bool>}");
         c.input["voice_assignment"] = enumArg("kind expression only: all_voices (default), this_voice, or preference (follow this "
                                               "MuseScore's 'dynamics apply to all voices' setting, as the UI does)",
                                               { "all_voices", "this_voice", "preference" });
@@ -178,8 +178,8 @@ void mu::agent::registerTextCommands(CommandRegistry& registry)
               "with an extender must be single or end. The lyric just before and just after are repaired the way the "
               "space and hyphen keys repair them (listed in adjusted). verse is 1-based (default 1); placement "
               "above/below (default: the style). A slot that already has a lyric of that verse: if_exists error "
-              "(default, E_EXISTS) or replace. Refuses an extender that ends on a rest, before its note, or over another "
-              "syllable (E_INVALID_ARG), inconsistent syllabic values, text ending in - or _, a measure repeat "
+              "(default, E_EXISTS) or replace. Refuses an extender that starts or ends on a rest, before its note, or over "
+              "another syllable (E_INVALID_ARG), inconsistent syllabic values, text ending in - or _, a measure repeat "
               "(E_INVALID_ARG), a sequence that runs past the last note or a staff/bar/beat/voice outside the score "
               "(E_RANGE), and a note whose linked part has no note or rest at that tick (E_REFUSED; MuseScore would "
               "crash adding it). No partial lyric lines over "

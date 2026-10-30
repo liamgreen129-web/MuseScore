@@ -437,15 +437,20 @@ private:
                 // plainText() keeps a <sym> as its SMuFL code point (textbase.cpp:1727-1734): the
                 // metronome's note. Without it a metronome-only marking reads " = 96", which is the
                 // paren part, not text; "Allegro <note> = 120" keeps "Allegro"
-                std::string txt = withoutSymbols(t->plainText());
-                txt.erase(0, txt.find_first_not_of(' '));
-                if (!txt.empty() && txt[0] != '=') {
-                    const size_t eq = txt.find(" = ");
-                    std::string words = eq == std::string::npos ? txt : txt.substr(0, eq);
-                    words.erase(words.find_last_not_of(' ') + 1);
-                    if (!words.empty()) {
-                        m.text = words;
-                    }
+                // The words are what comes before the mark's "=", after TempoText::updateTempo's own
+                // clean-up (tempotext.cpp:265-273: approximately-equal signs and "~" read as "=",
+                // "ca." / "c." / "approx." dropped): "Allegro (<note> = ca. 132)" keeps "Allegro"
+                String clean = t->plainText();
+                clean.replace(u"\u2252", u"=");
+                clean.replace(u"\u2248", u"=");
+                clean.replace(u"~", u"=");
+                std::string txt = withoutSymbols(clean);
+                const size_t eq = txt.find('=');
+                std::string words = eq == std::string::npos ? txt : txt.substr(0, eq);
+                words.erase(0, words.find_first_not_of(' '));
+                words.erase(words.find_last_not_of(" (") + 1);
+                if (!words.empty()) {
+                    m.text = words;
                 }
                 const double bpm = t->tempo().val * 60.0;
                 m.paren = "q=" + std::to_string(static_cast<int>(std::lround(bpm)));

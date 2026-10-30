@@ -43,6 +43,11 @@
       "note": "the fixture already has this chord here: no change and no undo entry (DECISIONS 2026-10-30, text Q6)"
     },
     {
+      "assert": "undoIndex",
+      "delta": 1,
+      "note": "step 2 made no undo entry"
+    },
+    {
       "tool": "add_chord_symbol",
       "writes": true,
       "args": {
@@ -92,6 +97,11 @@
         "status": "unchanged"
       },
       "note": "the fixture already has this chord here: no change and no undo entry (DECISIONS 2026-10-30, text Q6)"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 3,
+      "note": "step 5 made no undo entry"
     },
     {
       "tool": "add_chord_symbol",

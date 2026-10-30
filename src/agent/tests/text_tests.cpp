@@ -644,7 +644,7 @@ TEST_F(Agent_Text, TempoValidation)
     ValMap notNum;
     notNum["bpm"] = Val("fast");
     refused(TXT, with(base, "tempo", Val(notNum)), AErr::InvalidArg, "greater than 0");
-    refused(TXT, with(base, "tempo", tempoArg(120, "x")), AErr::InvalidArg, "beat_unit must");
+    refused(TXT, with(base, "tempo", tempoArg(120, "z")), AErr::InvalidArg, "beat_unit must"); // x is a 64th
     ValMap unitOnly;
     unitOnly["beat_unit"] = Val("q");
     refused(TXT, with(base, "tempo", Val(unitOnly)), AErr::InvalidArg, "needs tempo.bpm");
@@ -933,6 +933,10 @@ TEST_F(Agent_Text, LyricPlacementValidation)
     refused(LYR, lyricArgs({ syl("a", "", posBeat(2, 1)) }, 3, 1), AErr::InvalidArg, "is not after");
     refused(LYR, lyricArgs({ syl("a", "", posBeat(1, 1)) }, 1, 1), AErr::InvalidArg, "is not after");
     refused(LYR, lyricArgs({ syl("a", "", posBeat(1, 1.5)) }, 1, 1), AErr::InvalidArg, "melisma_to");
+    {
+        const Ret r = run(LYR, lyricArgs({ syl("a", "", posBeat(1, 1.5)) }, 1, 1));
+        EXPECT_EQ(r.text().find("E_RANGE"), std::string::npos) << "one code per message: " << r.text();
+    }
     refused(LYR, lyricArgs({ syl("a", "", posBeat(99, 1)) }, 1, 1), AErr::Range, "outside the score");
     ASSERT_TRUE(run(LYR, lyricArgs({ syl("in") }, 1, 3)));
     refused(LYR, lyricArgs({ syl("a", "", posBeat(1, 4)) }, 1, 1), AErr::InvalidArg, "run over the lyric");
@@ -1103,6 +1107,21 @@ TEST_F(Agent_Text, TempoMarkSpelledAsUpdateTempoReadsIt)
         EXPECT_TRUE(out.at("followText").toBool()) << xml;
         ++measure;
     }
+    // every note pattern of updateTempo counts, and a relative mark ("<note> = <note>") too
+    for (const char* xml : { "<sym>metNoteQuarterUp</sym> <sym>metNoteQuarterUp</sym> = 120",
+                             "<sym>metNoteQuarterUp</sym> = <sym>metNote8thUp</sym>" }) {
+        Params p = without(textArgs("tempo", "", 1, measure, 1), "text");
+        p["xml"] = Val(std::string(xml));
+        refused(TXT, with(p, "tempo", tempoArg(100)), AErr::InvalidArg, "already has a metronome mark");
+    }
+    // a dotted 64th is no pattern of updateTempo (it reads nothing), so bpm is allowed
+    {
+        Params p = without(textArgs("tempo", "", 1, measure, 1), "text");
+        p["xml"] = Val("<sym>metNote64thUp</sym><sym>metAugmentationDot</sym> = 100");
+        ASSERT_TRUE(run(TXT, with(p, "tempo", tempoArg(90))));
+        EXPECT_NEAR(out.at("bpm").toDouble(), 90.0, 1e-6);
+        ++measure;
+    }
     // a note symbol with no number after it is not a mark: bpm is allowed and plays
     Params words = without(textArgs("tempo", "", 1, measure, 1), "text");
     words["xml"] = Val("<sym>metNoteQuarterUp</sym> swing");
@@ -1137,6 +1156,12 @@ TEST_F(Agent_Text, ExpressionPreferenceFollowsTheConfiguration)
     auto cfg = muse::modularity::globalIoc()->resolve<IEngravingConfiguration>("utests");
     auto* mock = dynamic_cast<EngravingConfigurationMock*>(cfg.get());
     ASSERT_TRUE(mock);
+    // put the setting back however this test ends, so later tests see the shared mock unchanged
+    struct Restore {
+        EngravingConfigurationMock* m;
+        bool was;
+        ~Restore() { ON_CALL(*m, dynamicsApplyToAllVoices()).WillByDefault(::testing::Return(was)); }
+    } restore { mock, mock->dynamicsApplyToAllVoices() };
     open("voices-four.mscz");
     ChordRest* v2 = find(score.get(), 1, [](ChordRest* c) { return c->isChord(); });
     ASSERT_TRUE(v2);
@@ -1259,8 +1284,30 @@ TEST_F(Agent_Text, LyricsInTheMelismaFixture)
         EXPECT_EQ(plainOf(crAt(score.get(), 4, 2)->lyrics(0, PlacementV::BELOW)), "der");
     });
     EXPECT_EQ(out.at("adjusted").toList().size(), 2u);
-    // replacing it with a middle syllable needs no repair
+    // replacing it with a middle syllable joins both neighbours into the word again
     ASSERT_TRUE(run(LYR, with(lyricArgs({ syl("dah", "middle") }, 4, 2), "if_exists", Val("replace"))));
     EXPECT_EQ(won->syllabic(), LyricsSyllabic::BEGIN);
     EXPECT_EQ(ful->syllabic(), LyricsSyllabic::END);
+    EXPECT_EQ(out.at("adjusted").toList().size(), 2u);
+}
+
+// score_read's tempo mark: the words before the metronome mark, without the note symbol, whatever
+// spelling of "=" updateTempo accepts
+TEST_F(Agent_Text, TempoMarkPrintsTheWordsOnly)
+{
+    const std::vector<std::pair<std::string, std::string> > cases = {
+        { "<sym>metNoteQuarterUp</sym> = 132", "+tempo(q=132)" },
+        { "Allegro <sym>metNoteQuarterUp</sym> = 120", "+tempo\"Allegro\"(q=120)" },
+        { "Allegro <sym>metNoteQuarterUp</sym>=120", "+tempo\"Allegro\"(q=120)" },
+        { "Allegro (<sym>metNoteQuarterUp</sym> = ca. 132)", "+tempo\"Allegro\"(q=132)" },
+        { "<sym>metNoteQuarterUp</sym> \u2248 108", "+tempo(q=108)" },
+    };
+    int measure = 1;
+    for (const auto& [xml, printed] : cases) {
+        Params p = without(textArgs("tempo", "", 1, measure, 1), "text");
+        p["xml"] = Val(xml);
+        ASSERT_TRUE(run(TXT, p)) << xml;
+        EXPECT_TRUE(outHas("notation", printed)) << xml << " -> " << outStr("notation");
+        ++measure;
+    }
 }
