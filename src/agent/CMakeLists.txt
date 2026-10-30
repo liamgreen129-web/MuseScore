@@ -85,6 +85,16 @@ target_sources(agent_marks PRIVATE
 target_include_directories(agent_marks PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(agent_marks PUBLIC agent_core agent_read engraving)
 
+# Text, chord symbols and lyrics (P2.4 text): engraving only, unit-tested without the app.
+# Registration (register.cpp) stays in the agent module.
+muse_create_module(agent_text NO_UNITY)
+target_sources(agent_text PRIVATE
+    commands/text/textops.cpp
+    commands/text/textops.h
+)
+target_include_directories(agent_text PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(agent_text PUBLIC agent_address agent_core agent_read agent_notation engraving)
+
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 
 target_sources(agent PRIVATE
@@ -119,6 +129,8 @@ target_sources(agent PRIVATE
     commands/test/testcommands.h
     commands/expression-marks/expressionmarkscommands.h
     commands/expression-marks/register.cpp
+    commands/text/textcommands.h
+    commands/text/register.cpp
 
     writes/notationundobackend.cpp
     writes/notationundobackend.h
@@ -137,7 +149,7 @@ target_sources(agent PRIVATE
     server/tokenstore.h
 )
 
-target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes agent_lines agent_marks)
+target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes agent_lines agent_marks agent_text)
 
 target_compile_definitions(agent PRIVATE AGENT_BUNDLE_ID="${MUSE_APP_GUI_IDENTIFIER}")
 

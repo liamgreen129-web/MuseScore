@@ -1,0 +1,282 @@
+{
+  "id": "TX02",
+  "title": "Tempo markings set playback; rehearsal marks continue the sequence",
+  "source": "P2.4 text (specs/text.md)",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/text.md add_text kind=tempo",
+    "specs/text.md add_text kind=rehearsal"
+  ],
+  "steps": [
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "tempo",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "tempo": {
+          "bpm": 132
+        }
+      },
+      "expect": {
+        "bpm": {
+          "gt": 131.99,
+          "lt": 132.01
+        },
+        "followText": true,
+        "notation": {
+          "contains": "+tempo(q=132)"
+        }
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "tempo",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 5,
+          "beat": 1
+        },
+        "text": "Allegro",
+        "tempo": {
+          "bpm": 144
+        }
+      },
+      "expect": {
+        "bpm": {
+          "gt": 143.99,
+          "lt": 144.01
+        },
+        "followText": false,
+        "notation": {
+          "contains": "+tempo\"Allegro\"(q=144)"
+        }
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "tempo",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 9,
+          "beat": 1
+        },
+        "text": "Andante"
+      },
+      "expect": {
+        "bpm": {
+          "gt": 79.99,
+          "lt": 80.01
+        },
+        "messages": {
+          "len": 1
+        }
+      },
+      "note": "words only keep MuseScore's default 80 to the beat (UI parity, spec TX-08)"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "tempo",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "Presto"
+      },
+      "error": "E_EXISTS"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "tempo",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "tempo": {
+          "bpm": 2000
+        }
+      },
+      "error": "E_INVALID_ARG"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "tempo",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "xml": "<sym>metNoteQuarterUp</sym> = 90",
+        "tempo": {
+          "bpm": 100
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "a metronome mark in the text and a bpm"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "text": "x",
+        "tempo": {
+          "bpm": 100
+        }
+      },
+      "error": "E_INVALID_ARG"
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "rehearsal",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        }
+      },
+      "expect": {
+        "text": "A"
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "rehearsal",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 5,
+          "beat": 1
+        }
+      },
+      "expect": {
+        "text": "B"
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "rehearsal",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 9,
+          "beat": 1
+        },
+        "text": "Coda"
+      },
+      "expect": {
+        "text": "Coda"
+      }
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "rehearsal",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 5,
+          "beat": 1
+        }
+      },
+      "error": "E_EXISTS"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 9,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "mark=A"
+            },
+            {
+              "contains": "mark=B"
+            },
+            {
+              "contains": "mark=Coda"
+            },
+            {
+              "contains": "+tempo(q=132)"
+            },
+            {
+              "contains": "+tempo\"Allegro\"(q=144)"
+            },
+            {
+              "contains": "+tempo\"Andante\"(q=80)"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/TX02_tempo_rehearsal.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

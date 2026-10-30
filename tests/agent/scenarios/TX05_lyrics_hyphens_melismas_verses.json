@@ -1,0 +1,346 @@
+{
+  "id": "TX05",
+  "title": "Lyrics: hyphens, an extender across the barline, verse 2, neighbours, refusals",
+  "source": "P2.4 text (specs/text.md)",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/text.md add_lyric"
+  ],
+  "steps": [
+    {
+      "tool": "add_lyric",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "verse": 1,
+        "syllables": [
+          {
+            "text": "Sing",
+            "syllabic": "begin"
+          },
+          {
+            "text": "ing",
+            "syllabic": "end"
+          },
+          {
+            "text": "a"
+          },
+          {
+            "text": "song",
+            "melisma_to": {
+              "measure": 2,
+              "beat": 2
+            }
+          },
+          {
+            "text": "of"
+          },
+          {
+            "text": "joy"
+          }
+        ]
+      },
+      "expect": {
+        "placed": {
+          "len": 6
+        },
+        "notation": {
+          "all": [
+            {
+              "contains": "m1 v1 | E5:q+ly\"Sing-\" G5:q+ly\"ing\" A5:q+ly\"a\" G5:q+ly\"song_\""
+            },
+            {
+              "contains": "m2 v1 | F5:q A5:q G5:q+ly\"of\" F5:q+ly\"joy\""
+            }
+          ]
+        }
+      },
+      "note": "S10's request; 'of' goes on the first chord after the extender"
+    },
+    {
+      "tool": "add_lyric",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "verse": 2,
+        "syllables": [
+          {
+            "text": "Twas"
+          },
+          {
+            "text": "brill",
+            "syllabic": "begin"
+          },
+          {
+            "text": "ig",
+            "syllabic": "end"
+          }
+        ]
+      },
+      "expect": {
+        "notation": {
+          "contains": "E5:q+ly\"Sing-\"+ly2\"Twas\""
+        }
+      }
+    },
+    {
+      "tool": "add_lyric",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "Ah",
+            "melisma_to": "self"
+          }
+        ]
+      },
+      "expect": {
+        "notation": {
+          "contains": "E5:q+ly\"Ah_\""
+        }
+      }
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "x"
+          }
+        ]
+      },
+      "error": "E_EXISTS"
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 2
+        },
+        "syllables": [
+          {
+            "text": "a",
+            "melisma_to": {
+              "measure": 2,
+              "beat": 1
+            }
+          }
+        ]
+      },
+      "error": "E_INVALID_ARG",
+      "note": "the extender ends before its note (S10's last step, which expects the code E_BAD_ARG)"
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 10,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "oh",
+            "melisma_to": "self"
+          }
+        ]
+      },
+      "error": "E_INVALID_ARG",
+      "note": "an extender on a rest"
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 10,
+          "beat": 3
+        },
+        "syllables": [
+          {
+            "text": "a"
+          },
+          {
+            "text": "men"
+          }
+        ]
+      },
+      "error": "E_RANGE",
+      "note": "no note after the last one"
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 4,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "Glo",
+            "syllabic": "begin"
+          },
+          {
+            "text": "ry"
+          }
+        ]
+      },
+      "error": "E_INVALID_ARG",
+      "note": "a syllable after a hyphen must be middle or end"
+    },
+    {
+      "tool": "add_lyric",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 4,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "Glo-"
+          }
+        ]
+      },
+      "error": "E_INVALID_ARG"
+    },
+    {
+      "tool": "add_lyric",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 2
+        },
+        "syllables": [
+          {
+            "text": "men",
+            "syllabic": "end"
+          }
+        ]
+      },
+      "expect": {
+        "adjusted": {
+          "len": 2
+        }
+      },
+      "note": "joined to 'Ah': it becomes begin and its one-note extender goes, as the hyphen key does"
+    },
+    {
+      "tool": "add_lyric",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "verse": 1,
+        "if_exists": "replace",
+        "syllables": [
+          {
+            "text": "Bring",
+            "syllabic": "begin"
+          }
+        ]
+      },
+      "expect": {
+        "statuses": {
+          "eq": [
+            "replaced"
+          ]
+        }
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 3,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 v1 | E5:q+ly\"Bring-\"+ly2\"Twas\""
+            },
+            {
+              "contains": "G5:q+ly\"song_\""
+            },
+            {
+              "contains": "m3 v1 | E5:q+ly\"Ah-\" D5:q+ly\"men\""
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/TX05_lyrics_hyphens_melismas_verses.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

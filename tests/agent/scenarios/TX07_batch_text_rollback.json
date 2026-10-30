@@ -1,0 +1,243 @@
+{
+  "id": "TX07",
+  "title": "A batch of text edits with one bad step changes nothing; the good batch is one undo entry",
+  "source": "P2.4 text (specs/text.md)",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/text.md add_text",
+    "specs/text.md add_chord_symbol",
+    "specs/text.md add_lyric"
+  ],
+  "steps": [
+    {
+      "tool": "batch",
+      "args": {
+        "name": "Lead sheet",
+        "operations": [
+          {
+            "command": "add_text",
+            "args": {
+              "kind": "tempo",
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 1,
+                "beat": 1
+              },
+              "text": "Swing",
+              "tempo": {
+                "bpm": 120
+              }
+            }
+          },
+          {
+            "command": "add_chord_symbol",
+            "args": {
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 1,
+                "beat": 2
+              },
+              "text": "Dm7"
+            }
+          },
+          {
+            "command": "add_lyric",
+            "args": {
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 1,
+                "beat": 1
+              },
+              "syllables": [
+                {
+                  "text": "Fly"
+                },
+                {
+                  "text": "me"
+                }
+              ]
+            }
+          },
+          {
+            "command": "add_text",
+            "args": {
+              "kind": "staff",
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "text": "mute"
+            }
+          },
+          {
+            "command": "add_chord_symbol",
+            "args": {
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 1,
+                "beat": 1
+              },
+              "text": "G7"
+            }
+          }
+        ]
+      },
+      "error": "E_EXISTS",
+      "note": "step 5 hits the existing C chord symbol"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 0
+    },
+    {
+      "tool": "batch",
+      "writes": true,
+      "args": {
+        "name": "Lead sheet",
+        "operations": [
+          {
+            "command": "add_text",
+            "args": {
+              "kind": "tempo",
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 1,
+                "beat": 1
+              },
+              "text": "Swing",
+              "tempo": {
+                "bpm": 120
+              }
+            }
+          },
+          {
+            "command": "add_chord_symbol",
+            "args": {
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 1,
+                "beat": 2
+              },
+              "text": "Dm7"
+            }
+          },
+          {
+            "command": "add_lyric",
+            "args": {
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 1,
+                "beat": 1
+              },
+              "syllables": [
+                {
+                  "text": "Fly"
+                },
+                {
+                  "text": "me"
+                }
+              ]
+            }
+          },
+          {
+            "command": "add_text",
+            "args": {
+              "kind": "staff",
+              "staff": {
+                "part": "Piano",
+                "index": 1
+              },
+              "at": {
+                "measure": 2,
+                "beat": 1
+              },
+              "text": "mute"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 1
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "+tempo\"Swing\"(q=120)"
+            },
+            {
+              "contains": "{Dm7}"
+            },
+            {
+              "contains": "ly\"Fly\""
+            },
+            {
+              "contains": "ly\"me\""
+            },
+            {
+              "contains": "+\"mute\""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "tool": "$redo"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/TX07_batch_text_rollback.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}
