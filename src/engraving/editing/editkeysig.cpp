@@ -43,7 +43,9 @@ void ChangeKeySig::flip(EditData*)
     Fraction tick = segment->tick();
     Staff* staff = keysig->staff();
 
-    const bool curEvtInStaff = (staff->currentKeyTick(tick) == tick);
+    // AGENT: an empty key list makes currentKeyTick() return 0, which read as "an event at tick 0"
+    // and made undo of a first key signature on such a staff add a C key event (and an explicit KeySig)
+    const bool curEvtInStaff = staff->keyList()->count(tick.ticks()) > 0;
     KeySigEvent curKey = keysig->keySigEvent();
     const bool curShowCourtesy = keysig->showCourtesy();
 

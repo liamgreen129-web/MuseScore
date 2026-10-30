@@ -219,6 +219,7 @@ void TextBase::endEdit(EditData& ed)
             Lyrics* prev = prevLyrics(toLyrics(this));
             if (prev) {
                 prev->setNeedRemoveInvalidSegments();
+                prev->setRemoveOneChordMelisma(); // AGENT: typing the next syllable still ends one, as before
                 renderer()->layoutItem(prev);
             }
         }

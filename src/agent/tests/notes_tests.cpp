@@ -29,6 +29,7 @@
 #include <sstream>
 
 #include "engraving/dom/accidental.h"
+#include "engraving/dom/beam.h"
 #include "engraving/dom/chord.h"
 #include "engraving/dom/excerpt.h"
 #include "engraving/dom/instrument.h"
@@ -1244,5 +1245,40 @@ TEST_F(Agent_WriteVoice, NoteEditsRedo)
         EXPECT_EQ(print(s.get(), 1, 2, 4), before);
         redo(s.get());
         EXPECT_EQ(print(s.get(), 1, 2, 4), after);
+    }
+}
+
+// S14: a beam's own properties (here its stem direction) should come back on undo of write_voice and
+// of the UI's range delete. Upstream bug, not fixed yet: Score::removeElement takes the chord out of
+// its beam (score.cpp:1686-1689) and undo does not put it back, so layout makes a new default beam.
+// A fix must keep the old beam's lifetime safe (beams are deleted directly in several places), see
+// DECISIONS 2026-10-30. Enable when fixed.
+TEST_F(Agent_WriteVoice, DISABLED_UndoKeepsBeamProperties)
+{
+    for (int path = 0; path < 2; ++path) {
+        SCOPED_TRACE(path == 0 ? "write_voice" : "deleteRange");
+        auto s = open("pickup-bar.mscz");
+        ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | C5:e D5:e E5:q F5:q").ret);
+        s->doLayout();
+        Beam* b = chordAt(s.get(), 2, 1)->beam();
+        ASSERT_TRUE(b);
+        s->startCmd(muse::TranslatableString::untranslatable("test: beam up"));
+        b->undoChangeProperty(Pid::STEM_DIRECTION, PropertyValue::fromValue(DirectionV::DOWN));
+        s->endCmd();
+        ASSERT_EQ(chordAt(s.get(), 2, 1)->beam()->getProperty(Pid::STEM_DIRECTION).value<DirectionV>(), DirectionV::DOWN);
+        if (path == 0) {
+            ASSERT_TRUE(runWrite(s.get(), 1, "m2 v1 | G4:q A4:q B4:q").ret);
+        } else {
+            Measure* m = address::allMeasures(s.get()).at(1);
+            s->startCmd(muse::TranslatableString::untranslatable("test: delete"));
+            s->deleteRange(m->first(SegmentType::ChordRest), m->nextMeasure()->first(SegmentType::ChordRest), 0, VOICES, SelectionFilter(), false);
+            s->endCmd();
+        }
+        undo(s.get());
+        s->doLayout();
+        Beam* after = chordAt(s.get(), 2, 1)->beam();
+        ASSERT_TRUE(after);
+        EXPECT_EQ(after->getProperty(Pid::STEM_DIRECTION).value<DirectionV>(), DirectionV::DOWN);
+        EXPECT_EQ(after, b);
     }
 }

@@ -277,7 +277,9 @@ bool KeySig::setProperty(Pid propertyId, const PropertyValue& v)
         break;
     }
     triggerLayoutAll();
-    setGenerated(false);
+    if (propertyId != Pid::GENERATED) { // AGENT: else undo of a GENERATED change could never restore true
+        setGenerated(false);
+    }
     return true;
 }
 

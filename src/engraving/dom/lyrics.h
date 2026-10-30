@@ -81,6 +81,7 @@ public:
 
     bool needRemoveInvalidSegments() const { return m_needRemoveInvalidSegments; }
     void setNeedRemoveInvalidSegments();
+    void setRemoveOneChordMelisma() { m_removeOneChordMelisma = true; } // AGENT: see removeInvalidSegments
     void removeInvalidSegments();
 
     LyricsLine* separator() const { return m_separator; }
@@ -116,6 +117,7 @@ private:
     LyricsSyllabic m_syllabic = LyricsSyllabic::SINGLE;
     LyricsLine* m_separator = nullptr;
     bool m_needRemoveInvalidSegments = false;
+    bool m_removeOneChordMelisma = false; // AGENT
     bool m_avoidBarlines = true;
 };
 

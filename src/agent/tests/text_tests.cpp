@@ -1313,3 +1313,23 @@ TEST_F(Agent_Text, TempoMarkPrintsTheWordsOnly)
         ++measure;
     }
 }
+
+// TX05: a one-chord extender survives undo of the edit that removed it (joining the next syllable
+// with a hyphen). Upstream layout used to drop it to 0 without undo (AGENT: fix in lyrics.cpp)
+TEST_F(Agent_Text, OneChordExtenderSurvivesUndo)
+{
+    ASSERT_TRUE(run(LYR, lyricArgs({ syl("Ah", "", Val("self")) }, 3, 1)));
+    Lyrics* ah = crAt(score.get(), 3, 1)->lyrics(0, PlacementV::BELOW);
+    ASSERT_TRUE(ah);
+    ASSERT_EQ(ah->ticks(), Lyrics::TEMP_MELISMA_TICKS);
+    const std::string saved = snapshot();
+    ASSERT_TRUE(run(LYR, lyricArgs({ syl("men", "end") }, 3, 2)));
+    EXPECT_EQ(ah->ticks(), Fraction(0, 1));
+    score->undoRedo(true, nullptr);
+    EXPECT_EQ(ah->ticks(), Lyrics::TEMP_MELISMA_TICKS);
+    EXPECT_EQ(snapshot(), saved);
+    score->undoRedo(false, nullptr);
+    score->undoRedo(true, nullptr);
+    EXPECT_EQ(ah->ticks(), Lyrics::TEMP_MELISMA_TICKS);
+    EXPECT_EQ(snapshot(), saved);
+}

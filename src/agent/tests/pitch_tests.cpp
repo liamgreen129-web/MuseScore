@@ -1486,3 +1486,17 @@ TEST_F(Agent_Pitch, TieExtendThroughARepeatIsRefused)
     refused(TR, p, AErr::InvalidArg, "is tied to");
     refused(TR, with(p, "ties", Val("extend")), AErr::InvalidArg, "partial ties");
 }
+
+// PT06: staff 1 has only a generated key signature at tick 0. Undo of the key change used to leave an
+// explicit C KeySig and key event (upstream fixes tagged AGENT: in ChangeKeySig::flip and
+// KeySig::setProperty, DECISIONS 2026-10-30)
+TEST_F(Agent_Pitch, TransposeToKeyUndoLeavesNoKeySignature)
+{
+    const std::string saved = snapshot();
+    ASSERT_TRUE(run(TR, trArgs(scoreRange(), toKey(2))));
+    score->undoRedo(true, nullptr);
+    EXPECT_EQ(score->staff(0)->keyList()->count(0), 0u);
+    EXPECT_EQ(snapshot(), saved);
+    score->undoRedo(false, nullptr);
+    EXPECT_EQ(int(score->staff(0)->concertKey(Fraction(0, 1))), 2);
+}

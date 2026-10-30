@@ -588,7 +588,13 @@ void Lyrics::undoChangeProperty(Pid id, const PropertyValue& v, PropertyFlags ps
 void Lyrics::removeInvalidSegments()
 {
     m_needRemoveInvalidSegments = false;
-    if (m_separator && isMelisma() && m_ticks < m_separator->startCR()->ticks()) {
+    // AGENT: keep a one-chord melisma (TEMP_MELISMA_TICKS; layout reads it as "its own chord") unless
+    // text entry asks for it to go (TextBase::endEdit, when the next syllable is typed). This runs in
+    // layout and changes ticks without undo, so it used to drop one whenever a neighbour was undone
+    // or redone, and undo could not restore the score.
+    const bool keepOneChord = m_ticks == TEMP_MELISMA_TICKS && !m_removeOneChordMelisma;
+    m_removeOneChordMelisma = false;
+    if (m_separator && isMelisma() && m_ticks < m_separator->startCR()->ticks() && !keepOneChord) {
         setTicks(Fraction(0, 1));
         m_separator->setTicks(Fraction(0, 1));
         m_separator->removeUnmanaged();
