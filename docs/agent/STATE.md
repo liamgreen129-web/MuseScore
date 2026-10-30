@@ -4,15 +4,19 @@ Updated by the conductor at the end of every session and before every STOP.
 
 - **Machine:** MacBook Pro (M1 Pro, 16 GB) for now; Mac mini later (DECISIONS 2026-10-29)
 - **Phase:** 2
-- **Current task:** cloud session (2026-10-30) on branch `agent/4.7-nfhpdz`, Linux, no build possible (Qt cannot be downloaded: DECISIONS 2026-10-30). Everything here is **unverified** until rebuilt and tested on the Mac.
-- **Last finished (cloud, unverified):** printer marks for system lines (EL04 tightened); `test_modal` test hook (S18); rest of the notes group (add_note_to_chord, remove_note, set_duration, exchange_voices, with unit tests and scenarios N03/N04); expression-lines and expression-marks moved onto address/address.h. Text and pitch groups being written by two command-implementers on branches `agent/text-impl` and `agent/pitch-impl`.
-- **Test status:** last Mac run was at 8e7a2425d2 (agent/4.7): scripts/test.sh 137/137, all suites PASS, scenarios 29 ok / 6 SKIP. Nothing on agent/4.7-nfhpdz has been compiled.
-- **Progress (estimate):** Phase 2 about 80% written, 65% verified; whole plan about 45% verified.
+- **Current task:** cloud session (2026-10-30) on branch `agent/4.7-nfhpdz` is at a clean point, waiting for the Mac run. Linux here, no build possible (Qt cannot be downloaded: DECISIONS 2026-10-30). Everything on this branch is **unverified** until it is rebuilt and tested on the Mac.
+- **Last finished (cloud, unverified):** Wave A is complete in code: notes (all ten commands), expression-lines, expression-marks, text (add_text, add_chord_symbol, add_lyric) and pitch (set_pitch, transpose), all registered in allcommands.cpp. Each group was reviewed twice by the reviewer agent, and every finding is fixed or recorded in DECISIONS. Also done: printer marks for system lines, tempo text without SMuFL symbols, the test_modal hook (S18), the expression groups moved onto address/address.h, MCP schemas with no "type" for any-typed arguments, specs/pitch.md and specs/text.md corrected, and the scenarios README.
+- **Checks run here:** `g++ -std=c++20 -fsyntax-only -Wall -Wextra -DNO_QT_SUPPORT -DENGRAVING_NO_API` on every src/agent .cpp that does not include Qt (all command libraries, the printer, the notation library and all unit-test files): no errors. The Qt-dependent files (server, writes, app glue, read/export/session/test commands) could not be checked. Nothing has been linked or run.
+- **Test status:** the last Mac run was at 8e7a2425d2 (agent/4.7): scripts/test.sh 137/137, all suites PASS, scenarios 29 ok / 6 SKIP.
+- **Progress (estimate):** Phase 2 is about 90% written and 65% verified; the whole plan is about 45% verified.
 - **Next, in order:**
-  1. **On the Mac:** `git fetch && git checkout agent/4.7-nfhpdz`; scripts/build.sh; scripts/test.sh; all tests/agent/*.py; scenarios/run.py (N03, N04 and any new text/pitch scenarios need `--update-goldens` once, then review the goldens). Fix compile errors first (none of this was compiled). Then merge into agent/4.7 per protocol.
-  2. Merge text and pitch (after their reviews), adding their register lines to allcommands.cpp.
-  3. P2.5: S01-S20 all passing, 8-hour soak (tests/agent/harness/soak.py --minutes 480), G2 report, then **STOP for Liam's G2 sign-off**.
-  4. Follow-up: can closing a score after a big range delete crash the real app (DECISIONS 2026-10-29, upstream bug)?
+  1. **On the Mac:** `git fetch && git checkout agent/4.7-nfhpdz`, then `scripts/build.sh`. Fix compile errors first; the Qt-side files were never checked.
+  2. Run `scripts/test.sh` (it now includes text_tests and pitch_tests) and all of `tests/agent/*.py`.
+  3. Run `scenarios/run.py`; N03, N04, TX01-07 and PT01-07 need `--update-goldens` once, then review the goldens.
+  4. Check that test_modal's dialog does not bring the background instance forward (DECISIONS 2026-10-30).
+  5. Merge into agent/4.7 per protocol.
+  6. P2.5: S01-S20 all passing, the 8-hour soak (tests/agent/harness/soak.py --minutes 480), the G2 report, then **STOP for Liam's G2 sign-off**.
+  7. Follow-up: can closing a score after a big range delete crash the real app (DECISIONS 2026-10-29, upstream bug)?
 - **Cloud session: what works there and what does not.**
   - The build and every test need this Mac: scripts/env.sh points at ~/Qt/6.10.2/macos and ~/musescore_deps_macos; the integration tests and scenarios launch the macOS app bundle (agent.install/mscore.app) with `open`; signing uses the "MuseScore Agent Local" keychain identity. A Linux cloud box has none of these, so it cannot build, run the unit tests, or run scenarios unless it sets up a Linux build of agent_tests itself (Qt 6.10.2 + MuseScore Linux deps; not tried, and the gtest tree alone is a large build).
   - Corpus fixtures (tests/fixtures/corpus/, 20 files) are git-ignored and not in the repo; tools/fixtures/make_corpus_fixtures.py regenerates them (needs network and a working mscore build). Synthetic fixtures are committed.
@@ -21,7 +25,7 @@ Updated by the conductor at the end of every session and before every STOP.
   - Never push to upstream musescore/MuseScore; never force-push; the official app and Liam's real scores are off limits (CLAUDE.md).
 - **Blockers / waiting on Liam:**
   1. Update the daily app 4.7.4 → 4.7.6.
-- **Background jobs:** cloud session: command-implementers for text and pitch; reviewer on the notes commits.
+- **Background jobs:** none.
 - **Worktrees in use:** none.
 - **Notes for the next session:**
   - **write_voice design (P2.3, decided, not yet coded)** — file `src/agent/commands/notes/` (own register.cpp; conductor adds to allcommands):
