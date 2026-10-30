@@ -28,8 +28,8 @@ namespace tx = mu::agent::text;
 
 namespace {
 const char* STAFF_DESC
-    = "The staff: {\"part\": \"<part name as in score_overview>\", \"index\": <staff in the part, 1-based, default 1>} "
-      "or {\"number\": <staff in the score, 1-based, as # sN in score_read>}";
+    = "The staff: its number in the score (1-based, as # sN in score_read), {\"number\": N}, or "
+      "{\"part\": \"<part name as in score_overview>\", \"index\": <staff in the part, 1-based, default 1>}";
 const char* POSITION_DESC
     = "{\"measure\": <bar by position, as m<N> in score_read; a pickup is 1>, \"beat\": <1-based, in quarter notes "
       "whatever the time signature: 1.5 is an eighth after the downbeat>} or {\"measure\", \"offset\": \"<n>/<d>\" "
@@ -89,15 +89,17 @@ void mu::agent::registerTextCommands(CommandRegistry& registry)
               "limited to <sym>Name</sym>, <b>, <i>, <u>, <s>, <sub>, <sup>. A tempo text with a metronome mark plays "
               "that number; words only with tempo.bpm play bpm (and stop following the text); words only without bpm "
               "keep MuseScore's default 80 to the beat (reported in messages). Refuses (E_RANGE) when no note or rest "
-              "starts exactly there (system kinds use any voice when voice is not given), a measure repeat "
-              "(E_INVALID_ARG), empty text, and a second tempo marking or rehearsal mark at the same place, or the same "
-              "text twice there (E_EXISTS). Returns the handle, where it went, and the bar's notation (staff text "
+              "starts exactly there (system kinds use any voice when voice is not given) or the voice is outside 1-4; "
+              "with E_INVALID_ARG a measure repeat, empty text, markup outside that subset, kind tempo with neither "
+              "text nor tempo.bpm, a tempo text that already has a metronome mark together with tempo.bpm, and a tempo "
+              "outside 5-999 quarter notes a minute (after beat_unit); with E_EXISTS a second tempo marking or "
+              "rehearsal mark at the same place, or the same text twice there. Returns the handle, where it went, and the bar's notation (staff text "
               "shows as +\"pizz.\", system text +sys\"...\", expression +exp\"...\", tempo +tempo\"...\"(q=N), "
               "rehearsal marks as mark= on the bar line of the top staff).";
         c.kind = CommandKind::Write;
         c.undoName = "Add text";
         c.input["kind"] = enumArg("staff, system, expression, tempo or rehearsal", tx::textKinds(), true);
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["at"] = arg(DataType::Object, std::string("The note or rest it attaches to: ") + POSITION_DESC);
         c.input["voice"] = voiceArg();
         c.input["target"] = arg(DataType::String, TARGET_DESC);
@@ -138,11 +140,13 @@ void mu::agent::registerTextCommands(CommandRegistry& registry)
               "parts get a copy, transposed where the part's concert pitch setting differs. If that position, staff and "
               "voice already has a chord symbol of the same notation, if_exists error (default) refuses with E_EXISTS "
               "and replace swaps it (status unchanged if it already reads the same). A symbol MuseScore cannot parse "
-              "is still added, as written, with recognised false. In the notation chord symbols are on the staff's h "
+              "is still added, as written, with recognised false. Refuses: E_INVALID_ARG for empty text or bad arguments, E_RANGE "
+              "for a staff, bar, beat or voice outside the score, E_EXISTS for an existing chord symbol (with if_exists "
+              "error) and for one that belongs to a fret diagram (never replaced). In the notation chord symbols are on the staff's h "
               "line: m3 h | {G7}:h {C}:h. Returns the handle, status (added, replaced, unchanged), name and the bar's notation.";
         c.kind = CommandKind::Write;
         c.undoName = "Add chord symbol";
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["at"] = arg(DataType::Object, std::string("Where: ") + POSITION_DESC + "; any position inside the bar");
         c.input["voice"] = voiceArg();
         c.input["target"] = arg(DataType::String, TARGET_DESC);
@@ -175,12 +179,15 @@ void mu::agent::registerTextCommands(CommandRegistry& registry)
               "space and hyphen keys repair them (listed in adjusted). verse is 1-based (default 1); placement "
               "above/below (default: the style). A slot that already has a lyric of that verse: if_exists error "
               "(default, E_EXISTS) or replace. Refuses an extender that ends on a rest, before its note, or over another "
-              "syllable (E_INVALID_ARG), a sequence that runs past the last note (E_RANGE). No partial lyric lines over "
+              "syllable (E_INVALID_ARG), inconsistent syllabic values, text ending in - or _, a measure repeat "
+              "(E_INVALID_ARG), a sequence that runs past the last note or a staff/bar/beat/voice outside the score "
+              "(E_RANGE), and a note whose linked part has no note or rest at that tick (E_REFUSED; MuseScore would "
+              "crash adding it). No partial lyric lines over "
               "repeats are made. In the notation: +ly\"Sing-\" (hyphen), +ly\"song_\" (extender), +ly2\"...\" (verse 2). "
               "Returns the handles, where each syllable went, and the notation of the bars.";
         c.kind = CommandKind::Write;
         c.undoName = "Add lyrics";
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["at"] = arg(DataType::Object, std::string("The note (or rest) of the first syllable: ") + POSITION_DESC);
         c.input["voice"] = voiceArg();
         c.input["target"] = arg(DataType::String, TARGET_DESC);

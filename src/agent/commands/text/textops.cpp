@@ -32,6 +32,7 @@
 #include "engraving/dom/factory.h"
 #include "engraving/dom/fret.h"
 #include "engraving/dom/harmony.h"
+#include "engraving/dom/interval.h"
 #include "engraving/dom/lyrics.h"
 #include "engraving/dom/masterscore.h"
 #include "engraving/dom/measure.h"
@@ -46,6 +47,7 @@
 #include "engraving/dom/systemtext.h"
 #include "engraving/dom/tempotext.h"
 #include "engraving/dom/textbase.h"
+#include "engraving/editing/transpose.h"
 #include "engraving/style/style.h"
 #include "engraving/types/constants.h"
 #include "engraving/types/symnames.h"
@@ -149,7 +151,7 @@ Ret voiceOf(const Params& p, int& voice)
     voice = 1;
     if (has(p, "voice")) {
         if (!isWhole(p.at("voice")) || p.at("voice").toDouble() < 1 || p.at("voice").toDouble() > 4) {
-            return makeErr(Err::InvalidArg, "voice must be 1-4");
+            return makeErr(Err::Range, "voice must be 1-4"); // as address::resolveTarget
         }
         voice = static_cast<int>(p.at("voice").toDouble());
     }
@@ -443,6 +445,10 @@ const std::vector<BeatUnit>& beatUnitTable()
         { "e", DurationType::V_EIGHTH, 0 },
         { "s.", DurationType::V_16TH, 1 },
         { "s", DurationType::V_16TH, 0 },
+        { "t.", DurationType::V_32ND, 1 },
+        { "t", DurationType::V_32ND, 0 },
+        { "x", DurationType::V_64TH, 0 },
+        { "y", DurationType::V_128TH, 0 },
     };
     return t;
 }
@@ -454,34 +460,52 @@ TDuration durationOf(const BeatUnit& u)
     return d;
 }
 
-//! The beat Score::addText's default tempo marking uses for a time signature (edit.cpp:965-1013)
+//! The beat Score::addText's default tempo marking uses for a time signature (edit.cpp:965-1013).
+//! One difference: for /128 compound metres upstream writes <sym>metNote64ndUp</sym> (edit.cpp:1006),
+//! a symbol that does not exist, and no tempo pattern reads a dotted 64th (tempotext.cpp:113-135,
+//! 170-200), so the default there is the 128th note.
 std::string defaultBeatUnit(MasterScore* score, const Fraction& tick)
 {
     const Fraction f = score->sigmap()->timesig(tick).nominal();
+    const bool compound = f.numerator() % 3 == 0;
     switch (f.denominator()) {
     case 1: return "w";
     case 2: return "h";
-    case 8: return f.numerator() % 3 == 0 ? "q." : "e";
-    case 16: return f.numerator() % 3 == 0 ? "e." : "s";
+    case 8: return compound ? "q." : "e";
+    case 16: return compound ? "e." : "s";
+    case 32: return compound ? "s." : "t";
+    case 64: return compound ? "t." : "x";
+    case 128: return "y";
     default: return "q";
     }
 }
 
 //! Does the text carry a metronome mark ("<note> = <number>") that TempoText::updateTempo would
-//! read? Looked at on a probe that is never added to the score.
+//! read? The same clean-up as updateTempo (tempotext.cpp:262-270), then its absolute pattern
+//! (note, spaces, "=", spaces, a number; :265-280). Looked at on a probe that is never added to the score.
 bool hasMetronomeMark(MasterScore* score, const String& xml)
 {
     std::unique_ptr<TempoText> probe(Factory::createTempoText(score->dummy()->segment()));
     probe->setXmlText(xml);
-    const String plainText = probe->plainText();
+    String s = probe->plainText();
+    s.replace(u",", u".");
+    s.replace(u"<sym>space</sym>", u" ");
+    s.replace(u"\u2252", u"="); // approximately equal to or the image of
+    s.replace(u"\u2248", u"="); // almost equal to
+    s.replace(u"~", u"=");
+    s.replace(u"ca.", u"");
+    s.replace(u"c.", u"");
+    s.replace(u"approx.", u"");
     int len = 0;
     TDuration d;
-    if (TempoText::findTempoDuration(plainText, len, d) < 0) {
-        return false; // no note symbol
+    const int at = TempoText::findTempoDuration(s, len, d); // a byte offset into the UTF-8 text
+    if (at < 0) {
+        return false; // no metronome note
     }
-    // and "= <number>" (updateTempo's pattern is "<note>\s*=\s*(\d+...)", tempotext.cpp:265-280)
-    static const std::regex number("=\\s*[0-9]");
-    return std::regex_search(plainText.toStdString(), number);
+    // the note (one SMuFL character, 3 bytes in UTF-8), optional augmentation dots (U+ECB7), then "= <digit>"
+    static const std::regex mark("^[\\s\\S]{3}(\\s*\xEE\xB2\xB7)*\\s*=\\s*[0-9]");
+    const std::string u8 = s.toStdString();
+    return std::regex_search(u8.substr(static_cast<size_t>(at)), mark);
 }
 
 // ------------------------------------------------------------------ text kinds
@@ -561,24 +585,24 @@ HarmonyType harmonyTypeOf(const std::string& n)
 
 //! Harmony::endEdit's substitutions of typed accidental symbols (harmony.cpp:787-808), with the
 //! double flat and double sharp written as the real code points U+1D12B and U+1D12A (upstream
-//! writes u"ᴒb", which is U+1D12 followed by 'b', so it never matches).
+//! writes u"\u1d12b" (harmony.cpp:790), which is U+1D12 followed by 'b', so it never matches).
 String normaliseChordText(String s, HarmonyType type)
 {
     if (type != HarmonyType::ROMAN) {
         s.replace(u"\U0001D12B", u"bb");
-        s.replace(u"♭", u"b");
-        s.replace(u"", u"b");
-        s.replace(u"♯", u"#");
-        s.replace(u"", u"#");
+        s.replace(u"\u266d", u"b");
+        s.replace(u"\ue260", u"b");
+        s.replace(u"\u266f", u"#");
+        s.replace(u"\ue262", u"#");
         s.replace(u"\U0001D12A", u"x");
-        s.replace(u"Δ", u"^");
-        s.replace(u"Ð", u"o");
-        s.replace(u"ø", u"0");
-        s.replace(u"Ø", u"0");
+        s.replace(u"\u0394", u"^");
+        s.replace(u"\u00d0", u"o");
+        s.replace(u"\u00f8", u"0");
+        s.replace(u"\u00d8", u"0");
     } else {
-        s.replace(u"", u"♭");
-        s.replace(u"", u"♮");
-        s.replace(u"", u"♯");
+        s.replace(u"\ue260", u"\u266d");
+        s.replace(u"\ue261", u"\u266e");
+        s.replace(u"\ue262", u"\u266f");
     }
     return s;
 }
@@ -1111,6 +1135,35 @@ Ret mu::agent::text::addChordSymbol(const Params& p, MasterScore* score, Out& ou
     if (Ret r = linkedCopiesPresent(h, expectedStaffCopies(h), "the chord symbol at " + place); !r) {
         return r;
     }
+    // a copy in a score whose concert-pitch setting differs is transposed by its staff's interval
+    // (edit.cpp:7174-7187, Transpose::undoTransposeHarmony with double sharps and flats allowed)
+    const bool concert = score->style().styleB(Sid::concertPitch);
+    for (EngravingObject* o : h->linkList()) {
+        if (o == h) {
+            continue;
+        }
+        const Harmony* c = toHarmony(o);
+        const bool partConcert = c->score()->style().styleB(Sid::concertPitch);
+        Interval iv;
+        if (partConcert != concert) {
+            iv = c->staff()->transpose(tick);
+            if (!partConcert) {
+                iv.flip();
+            }
+        }
+        const std::vector<HarmonyInfo*> mine = h->chords();
+        const std::vector<HarmonyInfo*> theirs = c->chords();
+        bool same = mine.size() == theirs.size();
+        for (size_t i = 0; same && i < mine.size(); ++i) {
+            const int root = iv.isZero() ? mine[i]->rootTpc() : Transpose::transposeTpc(mine[i]->rootTpc(), iv, true);
+            const int bass = iv.isZero() ? mine[i]->bassTpc() : Transpose::transposeTpc(mine[i]->bassTpc(), iv, true);
+            same = theirs[i]->rootTpc() == root && theirs[i]->bassTpc() == bass;
+        }
+        if (Ret r = core::expect(same, "the copy of the chord symbol at " + place + " in a part reads "
+                                 + plain(c->harmonyName()) + ", not transposed as that part's concert pitch setting needs"); !r) {
+            return r;
+        }
+    }
 
     const bool ok = recognised(h, text);
     const int bar = address::barOf(score, m);
@@ -1272,7 +1325,10 @@ Ret mu::agent::text::addLyric(const Params& p, MasterScore* score, Out& out)
             }
             ChordRest* ecr = nullptr;
             if (Ret r = address::chordRestAt(score, mm, t, track, ecr); !r) {
-                return makeErr(Err::InvalidArg, n + ": melisma_to: " + r.text());
+                const std::string t = r.text();
+                const size_t colon = t.find(": ");
+                return makeErr(Err::InvalidArg, n + ": melisma_to: " + (t.rfind("E_", 0) == 0 && colon != std::string::npos
+                                                                        ? t.substr(colon + 2) : t));
             }
             if (!ecr->isChord()) {
                 return makeErr(Err::InvalidArg, n + ": melisma_to (" + address::where(score, ecr) + ") is a rest; an extender "

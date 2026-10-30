@@ -38,7 +38,9 @@ class MasterScore;
 //! built with its text and added with Score::undoAddElement, Recipe B, as chord-symbol and lyric
 //! navigation do), checks the effect, and fills `out` with handles, a status and the compact
 //! notation of the touched bars. They run inside the runner's transaction and never open, lock
-//! or commit anything themselves, never enter text-edit mode and never read app preferences.
+//! or commit anything themselves and never enter text-edit mode. No default depends on app
+//! preferences: the only read of one is add_text's voice_assignment "preference" for expression
+//! text, which follows "dynamics apply to all voices" only when the caller asks for it.
 //! Kept free of AgentEnv so the unit tests call them inside a Transaction on a fixture.
 namespace mu::agent::text {
 using Out = std::map<std::string, muse::Val>;

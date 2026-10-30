@@ -52,7 +52,10 @@
 #include "engraving/dom/tempotext.h"
 #include "engraving/dom/textbase.h"
 #include "engraving/dom/pitchspelling.h"
+#include "engraving/editing/transpose.h"
 #include "engraving/editing/undo.h"
+#include "engraving/style/style.h"
+#include "engraving/tests/mocks/engravingconfigurationmock.h"
 #include "engraving/tests/utils/scorerw.h"
 #include "engraving/types/constants.h"
 
@@ -61,6 +64,8 @@
 #include "core/transaction.h"
 #include "core/undobackend.h"
 #include "registry/errors.h"
+
+#include "modularity/ioc.h"
 
 using namespace mu::agent;
 using namespace mu::agent::core;
@@ -282,6 +287,11 @@ int sum(const std::vector<int>& v)
     return n;
 }
 
+std::string plainOf(const TextBase* t)
+{
+    return t ? t->plainText().toStdString() : std::string("<none>");
+}
+
 EngravingItem* annotation(Segment* seg, ElementType t, track_idx_t track)
 {
     for (EngravingItem* a : seg->annotations()) {
@@ -436,7 +446,7 @@ TEST_F(Agent_Text, AddressErrors)
     refused(TXT, with(base, "staff", staffPart("Tuba")), AErr::Range, "no part named");
     refused(TXT, without(base, "at"), AErr::InvalidArg, "missing at");
     refused(TXT, with(base, "at", Val(3)), AErr::InvalidArg, "object");
-    refused(TXT, with(base, "voice", Val(5)), AErr::InvalidArg, "voice must be 1-4");
+    refused(TXT, with(base, "voice", Val(5)), AErr::Range, "voice must be 1-4");
     refused(TXT, with(base, "at", posBeat(99, 1)), AErr::Range, "outside the score");
     refused(TXT, with(base, "at", posBeat(1, 9)), AErr::Range, "past its end");
     refused(TXT, with(base, "at", posBeat(1, 1.5)), AErr::Range, "no note or rest starts");
@@ -751,7 +761,7 @@ TEST_F(Agent_Text, ChordSymbolValidation)
     refused(CHS, without(base, "staff"), AErr::InvalidArg, "missing staff");
     refused(CHS, with(base, "staff", staffNo(4)), AErr::Range, "outside");
     refused(CHS, without(base, "at"), AErr::InvalidArg, "missing at");
-    refused(CHS, with(base, "voice", Val(0)), AErr::InvalidArg, "voice must be 1-4");
+    refused(CHS, with(base, "voice", Val(0)), AErr::Range, "voice must be 1-4");
     refused(CHS, with(base, "at", posBeat(1, 5)), AErr::Range, "past its end");
     refused(CHS, with(base, "at", posBeat(11, 1)), AErr::Range, "outside the score");
     refused(CHS, with(base, "target", Val(makeHandle(crAt(score.get(), 1, 2)))), AErr::InvalidArg, "not both");
@@ -835,7 +845,7 @@ TEST_F(Agent_Text, ChordSymbolUnrecognisedAndAccidentals)
     EXPECT_FALSE(out.at("recognised").toBool());
     EXPECT_TRUE(out.count("messages"));
     EXPECT_EQ(outStr("name"), "foo");
-    ASSERT_TRUE(run(CHS, chordArgs("B♭7", 4, 2)));
+    ASSERT_TRUE(run(CHS, chordArgs("B\u266d7", 4, 2)));
     EXPECT_EQ(outStr("name"), "Bb7");
     EXPECT_TRUE(out.at("recognised").toBool());
     ASSERT_TRUE(run(CHS, chordArgs("N.C.", 5, 2)));
@@ -1069,4 +1079,188 @@ TEST_F(Agent_Text, LyricRefusedWhenALinkedPartHasNoNoteThere)
     Params p = at(score.get(), cr);
     p["syllables"] = syls({ syl("la") });
     refused(LYR, p, AErr::Refused, "linked part has no note");
+}
+
+// ================================================================== additions from the text review
+
+TEST_F(Agent_Text, TempoMarkSpelledAsUpdateTempoReadsIt)
+{
+    // TempoText::updateTempo turns the almost-equal sign (U+2248), U+2252 and "~" into "=" and drops "c." / "ca." / "approx."
+    // before matching (tempotext.cpp:262-270), so these are metronome marks too
+    const std::vector<std::pair<std::string, double> > marks = {
+        { "<sym>metNoteQuarterUp</sym> \u2248 120", 120.0 },
+        { "<sym>metNoteQuarterUp</sym> = c. 120", 120.0 },
+        { "<sym>metNoteQuarterUp</sym> ~ 108", 108.0 },
+        { "Allegro (<sym>metNoteQuarterUp</sym> = ca. 132)", 132.0 },
+    };
+    int measure = 1;
+    for (const auto& [xml, bpm] : marks) {
+        Params p = without(textArgs("tempo", "", 1, measure, 1), "text");
+        p["xml"] = Val(xml);
+        refused(TXT, with(p, "tempo", tempoArg(100)), AErr::InvalidArg, "already has a metronome mark");
+        ASSERT_TRUE(run(TXT, p)) << xml;
+        EXPECT_NEAR(out.at("bpm").toDouble(), bpm, 1e-6) << xml;
+        EXPECT_TRUE(out.at("followText").toBool()) << xml;
+        ++measure;
+    }
+    // a note symbol with no number after it is not a mark: bpm is allowed and plays
+    Params words = without(textArgs("tempo", "", 1, measure, 1), "text");
+    words["xml"] = Val("<sym>metNoteQuarterUp</sym> swing");
+    ASSERT_TRUE(run(TXT, with(words, "tempo", tempoArg(150))));
+    EXPECT_NEAR(out.at("bpm").toDouble(), 150.0, 1e-6);
+    EXPECT_FALSE(out.at("followText").toBool());
+}
+
+TEST_F(Agent_Text, SystemTextFallsBackToAnotherVoice)
+{
+    // voices-four bar 2 beat 4.5: only voice 2 starts there (voice 1 holds a half note from beat 3)
+    open("voices-four.mscz");
+    ASSERT_FALSE(crAt(score.get(), 2, 4.5, 0));
+    ChordRest* v2 = crAt(score.get(), 2, 4.5, 1);
+    ASSERT_TRUE(v2);
+    refused(TXT, textArgs("staff", "solo", 1, 2, 4.5), AErr::Range, "voice 1");
+    refused(TXT, with(textArgs("system", "Tutti", 1, 2, 4.5), "voice", Val(1)), AErr::Range, "voice 1");
+    addsOneEntry(TXT, textArgs("system", "Tutti", 1, 2, 4.5),
+                 [&] {
+        EngravingItem* t = annotation(v2->segment(), ElementType::SYSTEM_TEXT, 0);
+        ASSERT_TRUE(t) << "anchored on voice 2's note, stored on the top staff's voice 1";
+        EXPECT_EQ(toTextBase(t)->xmlText(), u"Tutti");
+    },
+                 [&] { EXPECT_FALSE(annotation(v2->segment(), ElementType::SYSTEM_TEXT, 0)); });
+    EXPECT_EQ(out.at("voice").toInt(), 1);
+}
+
+TEST_F(Agent_Text, ExpressionPreferenceFollowsTheConfiguration)
+{
+    // "preference" is the only path that reads the app setting; the unit-test configuration is a
+    // NiceMock registered by environment.cpp, so it can be switched both ways here
+    auto cfg = muse::modularity::globalIoc()->resolve<IEngravingConfiguration>("utests");
+    auto* mock = dynamic_cast<EngravingConfigurationMock*>(cfg.get());
+    ASSERT_TRUE(mock);
+    open("voices-four.mscz");
+    ChordRest* v2 = find(score.get(), 1, [](ChordRest* c) { return c->isChord(); });
+    ASSERT_TRUE(v2);
+    const Params base = with(with(at(score.get(), v2), "kind", Val("expression")), "voice_assignment", Val("preference"));
+
+    ON_CALL(*mock, dynamicsApplyToAllVoices()).WillByDefault(::testing::Return(true));
+    ASSERT_TRUE(run(TXT, with(base, "text", Val("dolce"))));
+    EXPECT_EQ(outStr("voiceAssignment"), "all_voices");
+    EXPECT_TRUE(annotation(v2->segment(), ElementType::EXPRESSION, 0));
+
+    ON_CALL(*mock, dynamicsApplyToAllVoices()).WillByDefault(::testing::Return(false));
+    ASSERT_TRUE(run(TXT, with(base, "text", Val("espress."))));
+    EXPECT_EQ(outStr("voiceAssignment"), "this_voice");
+    EXPECT_TRUE(annotation(v2->segment(), ElementType::EXPRESSION, 1));
+
+    // the default never asks: all_voices with the setting off
+    ASSERT_TRUE(run(TXT, with(without(base, "voice_assignment"), "text", Val("cantabile"))));
+    EXPECT_EQ(outStr("voiceAssignment"), "all_voices");
+}
+
+TEST_F(Agent_Text, ChordSymbolTransposedInAPartWithOtherConcertPitch)
+{
+    // parts-linked: the Bb clarinet (staff 2) has its own part. Show that part in concert pitch
+    // (fixture set-up, not under test); the master stays at written pitch, so a written C in the
+    // master must read Bb in that part (edit.cpp:7174-7187) and C in the Flute and Clarinet part
+    open("parts-linked.mscz");
+    Score* clarinetPart = nullptr;
+    for (Excerpt* ex : score->excerpts()) {
+        if (ex->excerptScore() && ex->name().contains(u"Clarinet") && !ex->name().contains(u"Flute")) {
+            clarinetPart = ex->excerptScore();
+        }
+    }
+    ASSERT_TRUE(clarinetPart);
+    ASSERT_FALSE(score->style().styleB(Sid::concertPitch));
+    clarinetPart->style().set(Sid::concertPitch, true);
+    const Interval iv = score->staff(1)->transpose(Fraction(0, 1));
+    ASSERT_FALSE(iv.isZero()) << "the clarinet transposes";
+
+    Segment* seg = crAt(score.get(), 1, 1, VOICES)->segment();
+    auto copies = [&]() {
+        std::vector<Harmony*> v;
+        const std::vector<Harmony*> hs = harmoniesAt(seg, VOICES);
+        if (hs.size() == 1) {
+            for (EngravingObject* o : hs.front()->linkList()) {
+                v.push_back(toHarmony(o));
+            }
+        }
+        return v;
+    };
+    auto check = [&]() {
+        const std::vector<Harmony*> hs = harmoniesAt(seg, VOICES);
+        ASSERT_EQ(hs.size(), 1u);
+        const int written = hs.front()->rootTpc();
+        ASSERT_TRUE(tpcIsValid(written));
+        const std::vector<Harmony*> all = copies();
+        ASSERT_EQ(all.size(), 3u) << "the master, the Clarinet part and the Flute and Clarinet part";
+        for (Harmony* h : all) {
+            if (h->score() == clarinetPart) {
+                EXPECT_EQ(h->rootTpc(), Transpose::transposeTpc(written, iv, true)) << "concert pitch in the part";
+                EXPECT_EQ(h->rootTpc(), static_cast<int>(Tpc::TPC_B_B));
+            } else {
+                EXPECT_EQ(h->rootTpc(), written) << "same concert-pitch setting as the master";
+            }
+        }
+    };
+    Params p = chordArgs("C", 1, 1, 2);
+    addsOneEntry(CHS, p, check, [&] { EXPECT_TRUE(harmoniesAt(seg, VOICES).empty()); });
+    // replace keeps the transposition right too
+    addsOneEntry(CHS, with(with(p, "text", Val("F7")), "if_exists", Val("replace")),
+                 [&] {
+        const std::vector<Harmony*> all = copies();
+        ASSERT_EQ(all.size(), 3u);
+        for (Harmony* h : all) {
+            EXPECT_EQ(h->harmonyName(), h->score() == clarinetPart ? u"Eb7" : u"F7");
+        }
+    },
+                 [&] { check(); });
+}
+
+TEST_F(Agent_Text, LyricsInTheMelismaFixture)
+{
+    open("lyrics-melismas-verses.mscz");
+    // verse 1 "light" (bar 2 beat 3, a half note) holds an extender to bar 3 beat 2
+    Lyrics* light = crAt(score.get(), 2, 3)->lyrics(0, PlacementV::BELOW);
+    ASSERT_TRUE(light);
+    ASSERT_EQ(plainOf(light), "light");
+    const Fraction lightTicks = light->ticks();
+    ASSERT_EQ(lightTicks, Fraction(3, 4));
+
+    // verse 3 stops after bar 2; carrying it on into bar 3 leaves verse 1's extender alone
+    // (adjustPrevious only looks at the same verse and placement, lyrics.cpp:300-318)
+    ASSERT_TRUE(run(LYR, with(lyricArgs({ syl("and"), syl("far") }, 3, 1), "verse", Val(3))));
+    EXPECT_EQ(light->ticks(), lightTicks);
+    EXPECT_FALSE(out.count("adjusted"));
+    ASSERT_TRUE(crAt(score.get(), 3, 2)->lyrics(2, PlacementV::BELOW));
+
+    // a verse-1 syllable under the extender: the extender is shortened, as entering it in the UI does
+    addsOneEntry(LYR, lyricArgs({ syl("oh") }, 3, 1),
+                 [&] { EXPECT_EQ(light->ticks(), Lyrics::TEMP_MELISMA_TICKS) << "s->tick() == prev->tick(): eps (lyrics.cpp:310-315)"; },
+                 [&] { EXPECT_EQ(light->ticks(), lightTicks); });
+    ASSERT_TRUE(out.count("adjusted"));
+    EXPECT_NE(out.at("adjusted").toList().front().toString().find("extender shortened"), std::string::npos)
+        << out.at("adjusted").toList().front().toString();
+
+    // replace the middle of "won-der-ful" (bar 4) with a single word: both neighbours are repaired
+    Lyrics* won = crAt(score.get(), 4, 1)->lyrics(0, PlacementV::BELOW);
+    Lyrics* ful = crAt(score.get(), 4, 3)->lyrics(0, PlacementV::BELOW);
+    ASSERT_TRUE(won && ful);
+    ASSERT_EQ(won->syllabic(), LyricsSyllabic::BEGIN);
+    ASSERT_EQ(ful->syllabic(), LyricsSyllabic::END);
+    addsOneEntry(LYR, with(lyricArgs({ syl("dah") }, 4, 2), "if_exists", Val("replace")),
+                 [&] {
+        EXPECT_EQ(won->syllabic(), LyricsSyllabic::SINGLE);
+        EXPECT_EQ(ful->syllabic(), LyricsSyllabic::SINGLE);
+        EXPECT_EQ(plainOf(crAt(score.get(), 4, 2)->lyrics(0, PlacementV::BELOW)), "dah");
+    },
+                 [&] {
+        EXPECT_EQ(won->syllabic(), LyricsSyllabic::BEGIN);
+        EXPECT_EQ(ful->syllabic(), LyricsSyllabic::END);
+        EXPECT_EQ(plainOf(crAt(score.get(), 4, 2)->lyrics(0, PlacementV::BELOW)), "der");
+    });
+    EXPECT_EQ(out.at("adjusted").toList().size(), 2u);
+    // replacing it with a middle syllable needs no repair
+    ASSERT_TRUE(run(LYR, with(lyricArgs({ syl("dah", "middle") }, 4, 2), "if_exists", Val("replace"))));
+    EXPECT_EQ(won->syllabic(), LyricsSyllabic::BEGIN);
+    EXPECT_EQ(ful->syllabic(), LyricsSyllabic::END);
 }
