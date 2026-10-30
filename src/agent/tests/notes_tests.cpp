@@ -1248,12 +1248,10 @@ TEST_F(Agent_WriteVoice, NoteEditsRedo)
     }
 }
 
-// S14: a beam's own properties (here its stem direction) should come back on undo of write_voice and
-// of the UI's range delete. Upstream bug, not fixed yet: Score::removeElement takes the chord out of
-// its beam (score.cpp:1686-1689) and undo does not put it back, so layout makes a new default beam.
-// A fix must keep the old beam's lifetime safe (beams are deleted directly in several places), see
-// DECISIONS 2026-10-30. Enable when fixed.
-TEST_F(Agent_WriteVoice, DISABLED_UndoKeepsBeamProperties)
+// S14: a beam's own properties (here its stem direction) come back on undo of write_voice and of the
+// UI's range delete: Score::removeElement takes the chord out of its beam, and undo used to leave
+// layout to make a new default beam (AGENT: fix in RemoveElement, DECISIONS 2026-10-30)
+TEST_F(Agent_WriteVoice, UndoKeepsBeamProperties)
 {
     for (int path = 0; path < 2; ++path) {
         SCOPED_TRACE(path == 0 ? "write_voice" : "deleteRange");
@@ -1280,5 +1278,13 @@ TEST_F(Agent_WriteVoice, DISABLED_UndoKeepsBeamProperties)
         ASSERT_TRUE(after);
         EXPECT_EQ(after->getProperty(Pid::STEM_DIRECTION).value<DirectionV>(), DirectionV::DOWN);
         EXPECT_EQ(after, b);
+        // and again after a redo and a second undo
+        s->undoRedo(false, nullptr);
+        s->doLayout();
+        undo(s.get());
+        s->doLayout();
+        ASSERT_TRUE(chordAt(s.get(), 2, 1)->beam());
+        EXPECT_EQ(chordAt(s.get(), 2, 1)->beam(), b);
+        EXPECT_EQ(b->elements().size(), 2u);
     }
 }

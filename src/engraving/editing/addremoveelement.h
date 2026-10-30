@@ -26,6 +26,8 @@
 #include "../dom/segment.h"
 
 namespace mu::engraving {
+class Beam; // AGENT
+
 class AddElement : public UndoCommand
 {
     OBJECT_ALLOCATOR(engraving, AddElement)
@@ -54,6 +56,10 @@ class RemoveElement : public UndoCommand
     OBJECT_ALLOCATOR(engraving, RemoveElement)
 
     EngravingItem* element = nullptr;
+    // AGENT: the non-generated beam a removed chord or rest was in; undo puts it back there
+    // (Score::removeElement takes it out of the beam, and a new default beam would lose the beam's
+    // own properties). Such beams are freed only by undo cleanup, never directly, so it stays valid.
+    Beam* m_beam = nullptr;
 
 public:
     RemoveElement(EngravingItem*);

@@ -25,6 +25,7 @@
 #include "containers.h"
 
 #include "../dom/arpeggio.h"
+#include "../dom/beam.h" // AGENT
 #include "../dom/chord.h"
 #include "../dom/engravingitem.h"
 #include "../dom/keysig.h"
@@ -300,6 +301,9 @@ void RemoveElement::undo(EditData*)
             }
         }
         undoAddTuplet(toChordRest(element));
+        if (m_beam && !toChordRest(element)->beam()) { // AGENT: see m_beam
+            m_beam->add(element);
+        }
     } else if (element->isClef()) {
         score->setLayout(element->staff()->nextClefTick(element->tick()), element->staffIdx());
     } else if (element->isKeySig()) {
@@ -314,6 +318,12 @@ void RemoveElement::undo(EditData*)
 void RemoveElement::redo(EditData*)
 {
     Score* score = element->score();
+
+    // AGENT: see m_beam
+    m_beam = nullptr;
+    if (element->isChordRest() && toChordRest(element)->beam() && !toChordRest(element)->beam()->generated()) {
+        m_beam = toChordRest(element)->beam();
+    }
 
     if (!element->isTuplet()) {
         score->removeElement(element);
