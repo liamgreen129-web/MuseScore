@@ -15,6 +15,7 @@ set(MODULE_TEST_SRC
     ${CMAKE_CURRENT_LIST_DIR}/expression_lines_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/expression_marks_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/text_tests.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/pitch_tests.cpp
     ${PROJECT_SOURCE_DIR}/src/engraving/tests/utils/scorerw.cpp
     ${PROJECT_SOURCE_DIR}/src/engraving/tests/utils/scorerw.h
 )
@@ -28,6 +29,7 @@ set(MODULE_TEST_LINK
     agent_lines
     agent_marks
     agent_text
+    agent_pitch
     engraving
 )
 

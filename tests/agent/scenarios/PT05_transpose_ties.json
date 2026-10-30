@@ -1,0 +1,97 @@
+{
+  "id": "PT05",
+  "title": "transpose: a tie leaving the range is refused, or the range is widened over the chain",
+  "source": "P2.4 pitch (TRN-07)",
+  "fixture": "synthetic/ties-barlines.mscz",
+  "specs": [
+    "specs/pitch.md transpose"
+  ],
+  "steps": [
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "start": {
+            "measure": 3,
+            "beat": 3
+          },
+          "end": {
+            "measure": 3,
+            "beat": 4
+          }
+        },
+        "by": {
+          "interval": "M2",
+          "direction": "up"
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "the G4 on beat 4 is tied into bars 4 and 5"
+    },
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": {
+          "start": {
+            "measure": 3,
+            "beat": 3
+          },
+          "end": {
+            "measure": 3,
+            "beat": 4
+          }
+        },
+        "by": {
+          "interval": "M2",
+          "direction": "up"
+        },
+        "ties": "extend"
+      },
+      "expect": {
+        "extendedForTies": true,
+        "bars": "m3-m5",
+        "notes": 4
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 3,
+        "to": 5
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "B4:q A4:q~"
+            },
+            {
+              "contains": "m4 v1 | A4:w~"
+            },
+            {
+              "contains": "m5 v1 | A4:h"
+            },
+            {
+              "contains": "m3 v1 | [C5,E5,G5]:h B4:q A4:q~"
+            }
+          ]
+        }
+      },
+      "note": "the whole chain moved; the chord tied in from bar 2 and bar 5's second half did not"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/PT05_transpose_ties.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Golden not produced yet (no build in the cloud session): run --update-goldens on the Mac and review."
+  ]
+}

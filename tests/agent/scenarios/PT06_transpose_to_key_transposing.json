@@ -1,0 +1,134 @@
+{
+  "id": "PT06",
+  "title": "transpose the whole score to a concert key: transposing instruments get their written keys",
+  "source": "P2.4 pitch (TRN-02, TRN-17)",
+  "fixture": "synthetic/transposing-instruments.mscz",
+  "specs": [
+    "specs/pitch.md transpose"
+  ],
+  "steps": [
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "score": true
+        },
+        "by": {
+          "key": 0
+        }
+      },
+      "expect": {
+        "status": "unchanged",
+        "changed": false
+      },
+      "note": "already in concert C, direction closest: nothing to do, no undo entry"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 0
+    },
+    {
+      "tool": "transpose",
+      "writes": true,
+      "args": {
+        "range": {
+          "score": true
+        },
+        "by": {
+          "key": 2,
+          "direction": "closest"
+        }
+      },
+      "expect": {
+        "status": "transposed",
+        "interval": "M2 up"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 1,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "key=D"
+            },
+            {
+              "contains": "m1 v1 | D4:q E4:q F#4:q G4:q"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 1,
+        "staves": [
+          2
+        ],
+        "pitch": "written"
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "key=E"
+            },
+            {
+              "contains": "m1 v1 | E4:q F#4:q G#4:q A4:q"
+            }
+          ]
+        }
+      },
+      "note": "the Bb trumpet reads in E major"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "handles": [
+            "garbage"
+          ]
+        },
+        "by": {
+          "key": 0
+        }
+      },
+      "error": "E_INVALID_ARG",
+      "note": "a malformed handle"
+    },
+    {
+      "tool": "transpose",
+      "args": {
+        "range": {
+          "score": true
+        },
+        "by": {
+          "key": 8
+        }
+      },
+      "error": "E_INVALID_ARG"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/PT06_transpose_to_key_transposing.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "Golden not produced yet (no build in the cloud session): run --update-goldens on the Mac and review."
+  ]
+}

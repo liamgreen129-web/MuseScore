@@ -95,6 +95,16 @@ target_sources(agent_text PRIVATE
 target_include_directories(agent_text PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(agent_text PUBLIC agent_address agent_core agent_read agent_notation engraving)
 
+# Pitch (P2.4): set_pitch and transpose, engraving only, so they are unit-tested without the
+# app. Registration (register.cpp) stays in the agent module.
+muse_create_module(agent_pitch NO_UNITY)
+target_sources(agent_pitch PRIVATE
+    commands/pitch/pitchops.cpp
+    commands/pitch/pitchops.h
+)
+target_include_directories(agent_pitch PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(agent_pitch PUBLIC agent_address agent_core agent_notes agent_read agent_notation engraving)
+
 muse_create_module(agent NO_UNITY) # small module; unity merging makes mcp:: and agent:: names collide
 
 target_sources(agent PRIVATE
@@ -131,6 +141,8 @@ target_sources(agent PRIVATE
     commands/expression-marks/register.cpp
     commands/text/textcommands.h
     commands/text/register.cpp
+    commands/pitch/pitchcommands.h
+    commands/pitch/register.cpp
 
     writes/notationundobackend.cpp
     writes/notationundobackend.h
@@ -149,7 +161,7 @@ target_sources(agent PRIVATE
     server/tokenstore.h
 )
 
-target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes agent_lines agent_marks agent_text)
+target_link_libraries(agent PRIVATE Qt::Network agent_notation agent_read agent_core agent_notes agent_lines agent_marks agent_text agent_pitch)
 
 target_compile_definitions(agent PRIVATE AGENT_BUNDLE_ID="${MUSE_APP_GUI_IDENTIFIER}")
 
