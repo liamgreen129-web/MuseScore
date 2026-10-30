@@ -8,12 +8,12 @@
       "Bash(ccache *)",
       "Bash(scripts/build.sh *)",
       "Bash(scripts/check-identity.sh *)",
-      "Bash(git status *)",
-      "Bash(git diff *)",
-      "Bash(git log *)",
-      "Bash(git grep *)",
-      "Bash(git worktree *)",
-      "Bash(df *)"
+      "Bash(git *)",
+      "Bash(python3 *)",
+      "Bash(g++ *)",
+      "Bash(df *)",
+      "Edit",
+      "Write"
     ],
     "ask": [
       "Bash(git push *)",
