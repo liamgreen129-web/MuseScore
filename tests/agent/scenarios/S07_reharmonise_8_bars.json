@@ -323,7 +323,7 @@
         },
         "text": ""
       },
-      "error": "E_EMPTY_TEXT"
+      "error": "E_INVALID_ARG"
     }
   ],
   "goldens": [
