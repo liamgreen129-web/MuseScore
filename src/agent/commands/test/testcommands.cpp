@@ -172,14 +172,16 @@ void mu::agent::registerTestCommands(CommandRegistry& registry)
                 r.ret = makeErr(Err::Internal, "no interactive service");
                 return r;
             }
-            static const muse::Uri dialog("muse://devtools/interactive/testdialog");
+            // non-modal: an application-modal window would start a macOS modal session that can bring
+            // the hidden app forward; isCurrentUriDialog does not look at modality, so the guard still sees it
+            static const muse::UriQuery dialog("muse://devtools/interactive/testdialog?modal=false");
             const std::string action = p.at("action").toString();
             if (action == "open") {
                 if (!env.interactive()->isOpened(dialog).val) {
                     env.interactive()->open(dialog);
                 }
-            } else if (env.interactive()->isOpened(dialog).val) {
-                env.interactive()->closeSync(muse::UriQuery(dialog));
+            } else {
+                env.interactive()->closeSync(dialog); // same query as opened (UriQuery::operator== compares params)
             }
             r.values["opened"] = Val(env.interactive()->isOpened(dialog).val);
             return r;

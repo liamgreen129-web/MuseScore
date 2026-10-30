@@ -28,8 +28,8 @@ namespace em = mu::agent::expression_marks;
 
 namespace {
 const char* STAFF_DESC
-    = "The staff: {\"part\": \"<part name as in score_overview>\", \"index\": <staff in the part, 1-based, default 1>} "
-      "or {\"number\": <staff in the score, 1-based, as # sN in score_read>}";
+    = "The staff: its number in the score (1-based, as # sN in score_read), {\"number\": N}, or "
+      "{\"part\": \"<part name as in score_overview>\", \"index\": <staff in the part, 1-based, default 1>}";
 const char* POSITION_DESC
     = "{\"measure\": <bar by position, as m<N> in score_read; a pickup is 1>, \"beat\": <1-based, in quarter notes "
       "whatever the time signature: 1.5 is an eighth after the downbeat>} or {\"measure\", \"offset\": \"<n>/<d>\" "
@@ -102,7 +102,7 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
               "handle, status (added, replaced or unchanged) and the bar's notation.";
         c.kind = CommandKind::Write;
         c.undoName = "Add dynamic";
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["at"] = arg(DataType::Object, std::string("Where: ") + POSITION_DESC);
         c.input["voice"] = voiceArg();
         c.input["target"] = arg(DataType::String, TARGET_DESC);
@@ -137,7 +137,7 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
         c.kind = CommandKind::Write;
         c.undoName = "Add hairpin";
         c.input["kind"] = enumArg("cresc, dim (hairpins), cresc_line, dim_line (\"cresc.\"/\"dim.\" text lines)", em::hairpinKinds(), true);
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC, true);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC, true);
         c.input["voice"] = voiceArg();
         c.input["from"] = arg(DataType::Object, std::string("The first note under the hairpin: ") + POSITION_DESC, true);
         c.input["to"] = arg(DataType::Object, std::string("The last note under the hairpin (inclusive): ") + POSITION_DESC, true);
@@ -166,7 +166,7 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
         c.kind = CommandKind::Write;
         c.undoName = "Add articulation";
         c.input["articulation"] = enumArg("Which articulation", em::articulationNames(), true);
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["at"] = arg(DataType::Object, std::string("The chord: ") + POSITION_DESC);
         c.input["through"] = arg(DataType::Object, "Optional end of a span (inclusive, same form as at)");
         c.input["voice"] = voiceArg();
@@ -192,7 +192,7 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
         c.kind = CommandKind::Write;
         c.undoName = "Add ornament";
         c.input["ornament"] = enumArg("Which ornament", em::ornamentNames(), true);
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["at"] = arg(DataType::Object, std::string("The chord: ") + POSITION_DESC);
         c.input["through"] = arg(DataType::Object, "Optional end of a span (inclusive, same form as at)");
         c.input["voice"] = voiceArg();
@@ -219,7 +219,7 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
         c.kind = CommandKind::Write;
         c.undoName = "Add fermata";
         c.input["fermata"] = enumArg("Which fermata (default normal)", em::fermataNames());
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["at"] = arg(DataType::Object, std::string("The note or rest: ") + POSITION_DESC);
         c.input["voice"] = voiceArg();
         c.input["target"] = arg(DataType::String, TARGET_DESC);
@@ -249,7 +249,7 @@ void mu::agent::registerExpressionMarksCommands(CommandRegistry& registry)
         c.kind = CommandKind::Write;
         c.undoName = "Add breath mark";
         c.input["breath"] = enumArg("Which mark (default comma)", em::breathNames());
-        c.input["staff"] = arg(DataType::Object, STAFF_DESC);
+        c.input["staff"] = arg(DataType::Undefined, STAFF_DESC);
         c.input["after"] = arg(DataType::Object, std::string("The note or rest it follows: ") + POSITION_DESC);
         c.input["voice"] = voiceArg();
         c.input["target"] = arg(DataType::String, TARGET_DESC);

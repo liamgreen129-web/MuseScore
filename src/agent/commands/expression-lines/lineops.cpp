@@ -39,6 +39,7 @@
 #include <sstream>
 #include <vector>
 
+#include "address/address.h"
 #include "core/handles.h"
 #include "core/postconditions.h"
 #include "read/scoreprinter.h"
@@ -85,11 +86,6 @@ bool isInteger(const Val& v)
     }
     const double d = v.toDouble();
     return std::isfinite(d) && d == std::floor(d) && std::fabs(d) < 1e9;
-}
-
-std::string str(const muse::String& s)
-{
-    return s.toStdString();
 }
 
 std::string formatNumber(double d)
@@ -148,75 +144,22 @@ struct EventRef {
     int bar = 0;
 };
 
+//! An address module error with the argument's name in front: "E_RANGE: from: staff 9 is outside 1-3"
+Ret named(Ret r, const std::string& what)
+{
+    if (r) {
+        return r;
+    }
+    const std::string t = r.text();
+    const size_t c = t.find(": ");
+    return c == std::string::npos ? r : Ret(r.code(), t.substr(0, c + 2) + what + ": " + t.substr(c + 2));
+}
+
 RetVal<staff_idx_t> resolveStaff(MasterScore* score, const Val& v, const std::string& what)
 {
     RetVal<staff_idx_t> rv;
     rv.val = 0;
-    const int nstaves = static_cast<int>(score->nstaves());
-    if (isNumber(v)) {
-        if (!isInteger(v)) {
-            rv.ret = makeErr(Err::InvalidArg, what + ".staff must be a whole staff number or {part, index}");
-            return rv;
-        }
-        const int n = static_cast<int>(v.toDouble());
-        if (n < 1 || n > nstaves) {
-            rv.ret = makeErr(Err::Range, what + ".staff " + std::to_string(n) + " is outside staves 1-" + std::to_string(nstaves));
-            return rv;
-        }
-        rv.ret = muse::make_ok();
-        rv.val = static_cast<staff_idx_t>(n - 1);
-        return rv;
-    }
-    if (v.type() != Val::Type::Map) {
-        rv.ret = makeErr(Err::InvalidArg, what + ".staff must be a staff number (as score_read numbers them) or {part, index}");
-        return rv;
-    }
-    const ValMap m = v.toMap();
-    for (const auto& [k, val] : m) {
-        if (k != "part" && k != "index") {
-            rv.ret = makeErr(Err::InvalidArg, what + ".staff has unknown key '" + k + "' (expected part, index)");
-            return rv;
-        }
-    }
-    auto pit = m.find("part");
-    if (pit == m.end() || pit->second.type() != Val::Type::String) {
-        rv.ret = makeErr(Err::InvalidArg, what + ".staff.part must be the part's name as score_overview lists it");
-        return rv;
-    }
-    int index = 1;
-    if (auto iit = m.find("index"); iit != m.end() && !iit->second.isNull()) {
-        if (!isInteger(iit->second)) {
-            rv.ret = makeErr(Err::InvalidArg, what + ".staff.index must be a whole number (1 = the part's top staff)");
-            return rv;
-        }
-        index = static_cast<int>(iit->second.toDouble());
-    }
-    const std::string name = pit->second.toString();
-    std::vector<Part*> found;
-    std::string names;
-    for (Part* part : score->parts()) {
-        if (str(part->partName()) == name) {
-            found.push_back(part);
-        }
-        names += (names.empty() ? "" : ", ") + ("\"" + str(part->partName()) + "\"");
-    }
-    if (found.empty()) {
-        rv.ret = makeErr(Err::Range, what + ".staff: no part named \"" + name + "\"; parts are " + names);
-        return rv;
-    }
-    if (found.size() > 1) {
-        rv.ret = makeErr(Err::InvalidArg, what + ".staff: " + std::to_string(found.size()) + " parts are named \"" + name
-                         + "\"; give the staff number instead");
-        return rv;
-    }
-    const int partStaves = static_cast<int>(found.front()->nstaves());
-    if (index < 1 || index > partStaves) {
-        rv.ret = makeErr(Err::Range, what + ".staff.index " + std::to_string(index) + " is outside 1-" + std::to_string(partStaves)
-                         + " for \"" + name + "\"");
-        return rv;
-    }
-    rv.ret = muse::make_ok();
-    rv.val = found.front()->staves().at(static_cast<size_t>(index - 1))->idx();
+    rv.ret = named(address::resolveStaff(score, v, rv.val), what);
     return rv;
 }
 
@@ -261,24 +204,16 @@ RetVal<EventRef> resolveEvent(MasterScore* score, const Val& v, const std::strin
         return rv;
     }
 
-    static const std::set<std::string> keys { "measure", "beat", "tick", "staff", "voice", "grace" };
+    static const std::set<std::string> keys { "measure", "beat", "offset", "tick", "staff", "voice", "grace" };
     for (const auto& [k, val] : m) {
         if (!keys.count(k)) {
             return fail(makeErr(Err::InvalidArg, what + " has unknown key '" + k
-                                + "' (expected handle, or measure, beat|tick, staff, voice, grace)"));
+                                + "' (expected handle, or measure, beat|offset|tick, staff, voice, grace)"));
         }
     }
-    auto mit = m.find("measure");
-    if (mit == m.end() || !isInteger(mit->second)) {
+    if (auto mit = m.find("measure"); mit == m.end() || !isInteger(mit->second)) {
         return fail(makeErr(Err::InvalidArg, what + ".measure is required: the bar number as score_read prints it (m<N>)"));
     }
-    const int bar = static_cast<int>(mit->second.toDouble());
-    const std::vector<Measure*> measures = allMeasures(score);
-    if (bar < 1 || bar > static_cast<int>(measures.size())) {
-        return fail(makeErr(Err::Range, what + ".measure " + std::to_string(bar) + " is outside bars 1-" + std::to_string(measures.size())));
-    }
-    Measure* measure = measures.at(static_cast<size_t>(bar - 1));
-
     auto sit = m.find("staff");
     if (sit == m.end()) {
         return fail(makeErr(Err::InvalidArg, what + ".staff is required: a staff number or {part, index}"));
@@ -296,50 +231,44 @@ RetVal<EventRef> resolveEvent(MasterScore* score, const Val& v, const std::strin
         voice = static_cast<int>(vit->second.toDouble());
     }
 
-    auto bit = m.find("beat");
-    auto tit = m.find("tick");
-    const bool hasBeat = bit != m.end() && !bit->second.isNull();
-    const bool hasTick = tit != m.end() && !tit->second.isNull();
-    if (hasBeat && hasTick) {
-        return fail(makeErr(Err::InvalidArg, what + ": give beat or tick, not both"));
-    }
-    int offset = 0; // ticks from the start of the bar
-    if (hasBeat) {
-        if (!isNumber(bit->second) || !std::isfinite(bit->second.toDouble())) {
-            return fail(makeErr(Err::InvalidArg, what + ".beat must be a number (1 = start of the bar, in quarter notes)"));
+    // the shared position (address/address.h): {measure, beat|offset}; tick (ticks from the bar's
+    // start, 480 per quarter) is kept for this group and turned into an offset
+    int given = 0;
+    for (const char* k : { "beat", "offset", "tick" }) {
+        if (auto it = m.find(k); it != m.end() && !it->second.isNull()) {
+            ++given;
         }
-        offset = static_cast<int>(std::lround((bit->second.toDouble() - 1.0) * Constants::DIVISION));
-    } else if (hasTick) {
-        if (!isInteger(tit->second)) {
+    }
+    if (given > 1) {
+        return fail(makeErr(Err::InvalidArg, what + ": give one of beat, offset or tick, not more"));
+    }
+    ValMap pos;
+    for (const char* k : { "measure", "beat", "offset" }) {
+        if (auto it = m.find(k); it != m.end() && !it->second.isNull()) {
+            pos[k] = it->second;
+        }
+    }
+    if (auto tit = m.find("tick"); tit != m.end() && !tit->second.isNull()) {
+        if (!isInteger(tit->second) || tit->second.toDouble() < 0) {
             return fail(makeErr(Err::InvalidArg, what + ".tick must be a whole number of ticks from the start of the bar (480 per quarter)"));
         }
-        offset = static_cast<int>(tit->second.toDouble());
+        Fraction f = Fraction::fromTicks(static_cast<int>(tit->second.toDouble()));
+        f.reduce();
+        pos["offset"] = Val(f.toString().toStdString());
     }
-    const std::string place = "m" + std::to_string(bar) + " beat " + formatNumber(1.0 + static_cast<double>(offset) / Constants::DIVISION)
-                              + " s" + std::to_string(staff.val + 1) + " v" + std::to_string(voice);
-    if (offset < 0 || offset >= measure->ticks().ticks()) {
-        return fail(makeErr(Err::Range, what + ": " + place + " is outside the bar (it holds "
-                            + formatNumber(static_cast<double>(measure->ticks().ticks()) / Constants::DIVISION) + " quarter beats)"));
+    Measure* measure = nullptr;
+    Fraction tick;
+    if (Ret r = address::resolvePosition(score, Val(pos), what, measure, tick); !r) {
+        return fail(named(r, what));
     }
+    const int bar = address::barOf(score, measure);
+    const std::string place = "m" + std::to_string(bar) + " beat " + beatText(measure, tick) + " s" + std::to_string(staff.val + 1)
+                              + " v" + std::to_string(voice);
 
     const track_idx_t track = staff.val * VOICES + static_cast<track_idx_t>(voice - 1);
-    const Fraction tick = measure->tick() + Fraction::fromTicks(offset);
     ChordRest* cr = nullptr;
-    if (Segment* seg = measure->findSegment(SegmentType::ChordRest, tick)) {
-        if (EngravingItem* e = seg->element(track); e && e->isChordRest()) {
-            cr = toChordRest(e);
-        }
-    }
-    if (!cr) {
-        std::string beats;
-        for (Segment* s = measure->first(SegmentType::ChordRest); s; s = s->next(SegmentType::ChordRest)) {
-            if (EngravingItem* e = s->element(track); e && e->isChordRest()) {
-                beats += (beats.empty() ? "" : ", ") + beatText(measure, s->tick());
-            }
-        }
-        return fail(makeErr(Err::Range, what + ": no chord or rest starts at " + place
-                            + (beats.empty() ? std::string(" (that voice is empty in this bar)")
-                               : " (events in that voice start on beats " + beats + ")")));
+    if (Ret r = address::chordRestAt(score, measure, tick, track, cr); !r) {
+        return fail(named(r, what));
     }
 
     if (auto git = m.find("grace"); git != m.end() && !git->second.isNull()) {
@@ -389,7 +318,7 @@ RetVal<Measure*> resolveBar(MasterScore* score, const Val& v, const std::string&
         return rv;
     }
     for (const auto& [k, val] : m) {
-        if (k == "beat" || k == "tick" || k == "grace") {
+        if (k == "beat" || k == "offset" || k == "tick" || k == "grace") {
             rv.ret = makeErr(Err::InvalidArg, what + ": a volta covers whole bars, so give {measure} only (no " + k + ")");
             return rv;
         }
