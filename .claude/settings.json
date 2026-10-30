@@ -11,6 +11,9 @@
       "Bash(git *)",
       "Bash(python3 *)",
       "Bash(g++ *)",
+      "Bash(unzip -p *)",
+      "Bash(unzip -l *)",
+      "Bash(clang++ -std=c++20 -fsyntax-only *)",
       "Bash(df *)",
       "Edit",
       "Write"
