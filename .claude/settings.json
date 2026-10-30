@@ -16,14 +16,18 @@
       "Bash(clang++ -std=c++20 -fsyntax-only *)",
       "Bash(df *)",
       "Edit",
-      "Write"
+      "Write",
+      "Bash",
+      "Read",
+      "Glob",
+      "Grep",
+      "Agent",
+      "WebFetch",
+      "WebSearch",
+      "mcp__github",
+      "mcp__claude-code-remote"
     ],
-    "ask": [
-      "Bash(git push *)",
-      "Bash(brew install *)",
-      "Bash(scripts/install.sh *)",
-      "Bash(scripts/sync-upstream.sh *)"
-    ],
+    "ask": [],
     "deny": [
       "Bash(sudo *)",
       "Bash(git push --force *)",
