@@ -1,0 +1,202 @@
+{
+  "id": "TX01",
+  "title": "Staff, system and expression text on notes; refusals leave the score alone",
+  "source": "P2.4 text (specs/text.md)",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/text.md add_text"
+  ],
+  "steps": [
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        },
+        "text": "pizz."
+      },
+      "expect": {
+        "status": "added",
+        "staff": 1,
+        "notation": {
+          "contains": "m3 v1 | E5:q+\"pizz.\" D5:q C5:q A4:q"
+        }
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "expression",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "dolce"
+      },
+      "expect": {
+        "voiceAssignment": "all_voices",
+        "notation": {
+          "contains": "E5:q+exp\"dolce\""
+        }
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "system",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 5,
+          "beat": 1
+        },
+        "xml": "<i>Tutti</i>"
+      },
+      "expect": {
+        "text": "Tutti",
+        "notation": {
+          "contains": "+sys\"Tutti\""
+        }
+      }
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        },
+        "text": "pizz."
+      },
+      "error": "E_EXISTS",
+      "note": "the same text at the same place twice"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1.5
+        },
+        "text": "arco"
+      },
+      "error": "E_RANGE",
+      "note": "no note starts between the beats"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 2
+        },
+        "text": "  "
+      },
+      "error": "E_INVALID_ARG"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 2
+        },
+        "xml": "<font size=\"20\">big</font>"
+      },
+      "error": "E_INVALID_ARG",
+      "note": "markup outside the allowed subset (spec Q1)"
+    },
+    {
+      "tool": "add_text",
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "number": 2
+        },
+        "at": {
+          "measure": 3,
+          "beat": 2
+        },
+        "text": "arco"
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 3
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 5,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m3 v1 | E5:q+\"pizz.\" D5:q C5:q A4:q"
+            },
+            {
+              "contains": "E5:q+exp\"dolce\""
+            },
+            {
+              "contains": "+sys\"Tutti\""
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/TX01_staff_system_expression_text.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "System text prints on staff 1 voice 1 only (the read printer's rule for system items)."
+  ]
+}

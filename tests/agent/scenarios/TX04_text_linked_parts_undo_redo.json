@@ -1,0 +1,244 @@
+{
+  "id": "TX04",
+  "title": "Text and chord symbols reach the linked parts; undo and redo follow",
+  "source": "P2.4 text (specs/text.md)",
+  "fixture": "synthetic/parts-linked.mscz",
+  "specs": [
+    "specs/text.md add_text (linked parts)",
+    "specs/text.md add_chord_symbol (linked parts)"
+  ],
+  "steps": [
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "notContains": "<Harmony"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "C"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "contains": "<Harmony"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/2_Flute_and_Clarinet/.*\\.mscx$",
+      "text": {
+        "contains": "<Harmony"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "notContains": "<Harmony"
+      },
+      "note": "the clarinet staff is not linked to the flute"
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "staff",
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "text": "con sord."
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "contains": "con sord."
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "notContains": "con sord."
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "system",
+        "staff": {
+          "number": 3
+        },
+        "at": {
+          "measure": 2,
+          "beat": 1
+        },
+        "text": "Tutti"
+      },
+      "expect": {
+        "staff": 1
+      },
+      "note": "anchored on the bassoon, which has no part: lands on the top staff and in every part"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "contains": "Tutti"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "contains": "Tutti"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/2_Flute_and_Clarinet/.*\\.mscx$",
+      "text": {
+        "contains": "Tutti"
+      }
+    },
+    {
+      "tool": "add_text",
+      "writes": true,
+      "args": {
+        "kind": "tempo",
+        "staff": {
+          "part": "Clarinet in B♭",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "Moderato",
+        "tempo": {
+          "bpm": 96
+        }
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "contains": "Moderato"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "notContains": "Moderato"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "notContains": "Tutti"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "notContains": "<Harmony"
+      }
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "all": [
+          {
+            "contains": "<Harmony"
+          },
+          {
+            "contains": "con sord."
+          },
+          {
+            "contains": "Tutti"
+          },
+          {
+            "contains": "Moderato"
+          }
+        ]
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/TX04_text_linked_parts_undo_redo.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}

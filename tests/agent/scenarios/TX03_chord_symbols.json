@@ -1,0 +1,266 @@
+{
+  "id": "TX03",
+  "title": "Chord symbols on notes, between notes, replaced, unparsed, refused",
+  "source": "P2.4 text (specs/text.md)",
+  "fixture": "synthetic/chord-symbols.mscz",
+  "specs": [
+    "specs/text.md add_chord_symbol"
+  ],
+  "steps": [
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 2
+        },
+        "text": "Dm7"
+      },
+      "expect": {
+        "status": "added",
+        "name": "Dm7",
+        "recognised": true,
+        "notation": {
+          "contains": "m1 h | {C}:q {Dm7}:q {Am7}:h"
+        }
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 2,
+          "offset": "1/8"
+        },
+        "text": "G7/B"
+      },
+      "expect": {
+        "name": "G7/B",
+        "notation": {
+          "contains": "{G7/B}"
+        }
+      },
+      "note": "no note starts there: a new segment"
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "C6",
+        "if_exists": "replace"
+      },
+      "expect": {
+        "status": "replaced",
+        "notation": {
+          "contains": "m1 h | {C6}:q {Dm7}:q {Am7}:h"
+        }
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "text": "C6",
+        "if_exists": "replace"
+      },
+      "expect": {
+        "status": "unchanged"
+      }
+    },
+    {
+      "assert": "undoIndex",
+      "delta": 3
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 2
+        },
+        "text": "foo"
+      },
+      "expect": {
+        "recognised": false,
+        "name": "foo"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 4,
+          "beat": 2
+        },
+        "text": "B♭7"
+      },
+      "expect": {
+        "name": "Bb7"
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 8,
+          "beat": 3
+        },
+        "text": "F",
+        "if_exists": "replace"
+      },
+      "expect": {
+        "status": "replaced"
+      },
+      "note": "the chord change in the middle of bar 8's whole note"
+    },
+    {
+      "tool": "add_chord_symbol",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 3
+        },
+        "text": "D7"
+      },
+      "error": "E_EXISTS"
+    },
+    {
+      "tool": "add_chord_symbol",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 3
+        },
+        "text": " "
+      },
+      "error": "E_INVALID_ARG"
+    },
+    {
+      "tool": "add_chord_symbol",
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 5
+        },
+        "text": "D7"
+      },
+      "error": "E_RANGE"
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 8,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "m1 h | {C6}:q {Dm7}:q {Am7}:h"
+            },
+            {
+              "contains": "{G7/B}"
+            },
+            {
+              "contains": "{foo}"
+            },
+            {
+              "contains": "{Bb7}"
+            },
+            {
+              "contains": "m8 v1 | B4:w"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "add_chord_symbol",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Piano",
+          "index": 1
+        },
+        "at": {
+          "measure": 3,
+          "beat": 1
+        },
+        "text": "I",
+        "notation": "roman"
+      },
+      "expect": {
+        "status": "added"
+      },
+      "note": "a roman numeral sits beside the chord symbol (its own slot)"
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/TX03_chord_symbols.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  },
+  "questions": [
+    "The read printer prints only one of two harmonies that share a position (a chord symbol and a roman numeral): printHarmony gives the first a zero length. The roman step is therefore last and not read back."
+  ]
+}

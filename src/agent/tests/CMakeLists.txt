@@ -14,6 +14,7 @@ set(MODULE_TEST_SRC
     ${CMAKE_CURRENT_LIST_DIR}/notes_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/expression_lines_tests.cpp
     ${CMAKE_CURRENT_LIST_DIR}/expression_marks_tests.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/text_tests.cpp
     ${PROJECT_SOURCE_DIR}/src/engraving/tests/utils/scorerw.cpp
     ${PROJECT_SOURCE_DIR}/src/engraving/tests/utils/scorerw.h
 )
@@ -26,6 +27,7 @@ set(MODULE_TEST_LINK
     agent_address
     agent_lines
     agent_marks
+    agent_text
     engraving
 )
 

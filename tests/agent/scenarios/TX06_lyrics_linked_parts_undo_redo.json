@@ -1,0 +1,149 @@
+{
+  "id": "TX06",
+  "title": "Lyrics reach the linked parts; one undo removes the whole word everywhere",
+  "source": "P2.4 text (specs/text.md)",
+  "fixture": "synthetic/parts-linked.mscz",
+  "specs": [
+    "specs/text.md add_lyric (linked parts)"
+  ],
+  "steps": [
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "notContains": "<Lyrics"
+      }
+    },
+    {
+      "tool": "add_lyric",
+      "writes": true,
+      "args": {
+        "staff": {
+          "part": "Flute",
+          "index": 1
+        },
+        "at": {
+          "measure": 1,
+          "beat": 1
+        },
+        "syllables": [
+          {
+            "text": "Al",
+            "syllabic": "begin"
+          },
+          {
+            "text": "le",
+            "syllabic": "middle"
+          },
+          {
+            "text": "lu",
+            "syllabic": "middle"
+          },
+          {
+            "text": "ia",
+            "syllabic": "end",
+            "melisma_to": {
+              "measure": 2,
+              "beat": 2
+            }
+          }
+        ]
+      },
+      "expect": {
+        "notation": {
+          "contains": "E5:q+mf+ly\"Al-\" F5:q+ly\"le-\" G5:q+ly\"lu-\" A5:q+ly\"ia_\""
+        }
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "contains": "<Lyrics"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/2_Flute_and_Clarinet/.*\\.mscx$",
+      "text": {
+        "contains": "<Lyrics"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/1_Clarinet_in_Bb/.*\\.mscx$",
+      "text": {
+        "notContains": "<Lyrics"
+      }
+    },
+    {
+      "tool": "$undo"
+    },
+    {
+      "assert": "unchanged"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "notContains": "<Lyrics"
+      }
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/2_Flute_and_Clarinet/.*\\.mscx$",
+      "text": {
+        "notContains": "<Lyrics"
+      }
+    },
+    {
+      "tool": "$redo"
+    },
+    {
+      "assert": "exportMember",
+      "format": "mscz",
+      "member": "^Excerpts/0_Flute/.*\\.mscx$",
+      "text": {
+        "contains": "<Lyrics"
+      }
+    },
+    {
+      "tool": "score_read",
+      "args": {
+        "from": 1,
+        "to": 2,
+        "staves": [
+          1
+        ]
+      },
+      "expect": {
+        "text": {
+          "all": [
+            {
+              "contains": "ly\"Al-\""
+            },
+            {
+              "contains": "ly\"ia_\""
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "goldens": [
+    {
+      "format": "musicxml",
+      "path": "goldens/TX06_lyrics_linked_parts_undo_redo.musicxml"
+    }
+  ],
+  "invariants": {
+    "validate": true,
+    "undoRedo": true
+  }
+}
