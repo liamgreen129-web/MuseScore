@@ -25,6 +25,7 @@
 #include "read/readcommands.h"
 #include "session/sessioncommands.h"
 #include "test/testcommands.h"
+#include "text/textcommands.h"
 
 //! The one list of command groups. Only the conductor edits this file, at merge time
 //! (PLAN.md, build-tree rules), so parallel implementers never conflict here.
@@ -37,5 +38,6 @@ void mu::agent::registerAllCommands(CommandRegistry& registry)
     registerNotesCommands(registry);
     registerExpressionLinesCommands(registry);
     registerExpressionMarksCommands(registry);
+    registerTextCommands(registry);
     registerTestCommands(registry); // only with MUSESCORE_AGENT_TEST_COMMANDS=1
 }
