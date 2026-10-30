@@ -8,6 +8,14 @@ Path note: the action controller and UI action table are in
 `src/notationscene/internal/` (`notationactioncontroller.cpp`, `notationuiactions.cpp`);
 the Transpose dialog is `src/notationscene/widgets/transposedialog.{h,cpp,ui}`.
 
+**Corrections (2026-10-30, from the implementation and its reviews; DECISIONS 2026-10-30):**
+- The tpc range is -8 (`TPC_F_BBB`) to 40 (`TPC_B_SSS`); -1..33 is `TPC_F_BB`..`TPC_B_SS` (pitchspelling.h:40-51).
+- `Note::transposeDiatonic` can return false: when the unaltered target degree is out of range (note.cpp:4206-4208); only the final result is octave-wrapped (:4231).
+- `select(..., SelectType::REPLACE)` is a no-op (score.cpp:3377-3378): a list selection is `deselectAll` then `ADD`.
+- Pitch space is sounding (8va included) or written, as NOTATION.md section 2; not written|concert without the ottava. PITCH-13's expectation is inverted accordingly.
+- tpc2 cannot be predicted across a key change: `undoChangeKeySig` runs `Transpose::transpositionChanged` (edit.cpp:6078-6084), which respells tpc2 from the live (possibly respelled) staff transposition (staff.cpp:861-891). The post-condition checks pitch and tpc1 exactly and tpc2 after the call.
+- `oneOf` arguments cannot be registered; the shipped arguments are single-typed (DECISIONS 2026-10-30, pitch group). Group error codes are mapped to errors.h.
+
 ---
 
 ## Shared facts (both commands)

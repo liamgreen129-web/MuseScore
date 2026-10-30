@@ -7,6 +7,14 @@ Scout: api-scout (P0.S-text). Read-only research; nothing here has been compiled
 Path note: the UI action code lives in `src/notationscene/internal/`, not `src/notation/internal/`
 (`notationactioncontroller.cpp`, `notationuiactions.cpp`).
 
+**Corrections (2026-10-30, from the implementation and its reviews; DECISIONS 2026-10-30):**
+- Linked clones of system objects do not keep the anchor's voice: `ne->setTrack(ntrack)` (edit.cpp:6792) runs for the original and every clone, so all copies are on voice 1 (sections on system text, Q3).
+- `tt->undoChangeProperty(Pid::TEXT, xml)` does not compile for TempoText (its override is protected and hides the two-argument form, tempotext.h:107); call it through `EngravingObject*`.
+- The proposed group error codes (E_NO_CHORDREST, E_EMPTY_TEXT, E_BAD_ARG, ...) are not used: E_RANGE / E_INVALID_ARG / E_EXISTS / E_REFUSED with precise messages (DECISIONS 2026-10-29).
+- Upstream `harmony.cpp:790/799` write the double-flat/sharp code points as `u"\u1d12b"`/`u"\u1d12a"` (U+1D12 + a letter), so they never match; the agent uses U+1D12B / U+1D12A.
+- `TextBase::plainText()` keeps a `<sym>` as its SMuFL code point; score_read drops U+E000-U+F8FF from tempo text.
+- Known printer limit: two harmonies at one position (a chord symbol and a roman numeral) print only the second.
+
 ---
 
 ## 0. Shared findings (apply to every command in this group)
