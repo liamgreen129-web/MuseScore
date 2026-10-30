@@ -199,6 +199,19 @@ std::string plain(const String& s)
     return s.toStdString();
 }
 
+//! The text without SMuFL symbols (the private use area, U+E000-U+F8FF)
+std::string withoutSymbols(const String& s)
+{
+    String out;
+    for (size_t i = 0; i < s.size(); ++i) {
+        const char16_t c = s.at(i).unicode();
+        if (c < 0xE000 || c > 0xF8FF) {
+            out.append(s.at(i));
+        }
+    }
+    return out.toStdString();
+}
+
 //! Marks gathered from spanners, keyed by the ChordRest they start/end on.
 struct SpannerMarks {
     std::map<const ChordRest*, std::vector<nt::Mark> > start;
@@ -421,13 +434,18 @@ private:
             } else if (a->isTempoText()) {
                 const TempoText* t = toTempoText(a);
                 m.code = "tempo";
-                // a metronome-only marking's plain text is " = 96" once the note symbol is
-                // stripped; that is the paren part, not text
-                std::string txt = plain(t->plainText());
+                // plainText() keeps a <sym> as its SMuFL code point (textbase.cpp:1727-1734): the
+                // metronome's note. Without it a metronome-only marking reads " = 96", which is the
+                // paren part, not text; "Allegro <note> = 120" keeps "Allegro"
+                std::string txt = withoutSymbols(t->plainText());
                 txt.erase(0, txt.find_first_not_of(' '));
                 if (!txt.empty() && txt[0] != '=') {
                     const size_t eq = txt.find(" = ");
-                    m.text = eq == std::string::npos ? txt : txt.substr(0, eq);
+                    std::string words = eq == std::string::npos ? txt : txt.substr(0, eq);
+                    words.erase(words.find_last_not_of(' ') + 1);
+                    if (!words.empty()) {
+                        m.text = words;
+                    }
                 }
                 const double bpm = t->tempo().val * 60.0;
                 m.paren = "q=" + std::to_string(static_cast<int>(std::lround(bpm)));

@@ -25,7 +25,6 @@
     },
     {
       "tool": "add_chord_symbol",
-      "writes": true,
       "args": {
         "staff": {
           "part": "Piano",
@@ -37,7 +36,11 @@
         },
         "text": "Am7",
         "if_exists": "replace"
-      }
+      },
+      "expect": {
+        "status": "unchanged"
+      },
+      "note": "the fixture already has this chord here: no change and no undo entry (DECISIONS 2026-10-30, text Q6)"
     },
     {
       "tool": "add_chord_symbol",
@@ -73,7 +76,6 @@
     },
     {
       "tool": "add_chord_symbol",
-      "writes": true,
       "args": {
         "staff": {
           "part": "Piano",
@@ -85,7 +87,11 @@
         },
         "text": "Cmaj7",
         "if_exists": "replace"
-      }
+      },
+      "expect": {
+        "status": "unchanged"
+      },
+      "note": "the fixture already has this chord here: no change and no undo entry (DECISIONS 2026-10-30, text Q6)"
     },
     {
       "tool": "add_chord_symbol",
