@@ -504,7 +504,13 @@ private:
     {
         nt::Event e;
         e.duration = durationOf(cr);
-        if (cr->isRest()) {
+        if (cr->isMeasureRepeat()) {
+            // a MeasureRepeat is a Rest subclass with its own type: isRest() is false, and
+            // toChord() on it reads past the object. The notation has no measure repeat yet.
+            e.kind = nt::EventKind::FullBarRest;
+            m_details.push_back("detail: m" + std::to_string(m_barIndex) + " v" + std::to_string(cr->voice() + 1)
+                                + " is a measure repeat");
+        } else if (cr->isRest()) {
             const Rest* r = toRest(cr);
             e.kind = r->isGap() ? nt::EventKind::Gap : (r->isFullMeasureRest() ? nt::EventKind::FullBarRest : nt::EventKind::Rest);
             if (e.kind == nt::EventKind::Gap && cr->voice() == 0) {

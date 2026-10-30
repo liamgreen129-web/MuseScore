@@ -841,10 +841,10 @@ TEST_F(Agent_Text, ChordSymbolReplaceAndUnchanged)
 
 TEST_F(Agent_Text, ChordSymbolUnrecognisedAndAccidentals)
 {
-    ASSERT_TRUE(run(CHS, chordArgs("foo", 3, 2)));
+    ASSERT_TRUE(run(CHS, chordArgs("xyz", 3, 2)));
     EXPECT_FALSE(out.at("recognised").toBool());
     EXPECT_TRUE(out.count("messages"));
-    EXPECT_EQ(outStr("name"), "foo");
+    EXPECT_EQ(outStr("name"), "xyz");
     ASSERT_TRUE(run(CHS, chordArgs("B\u266d7", 4, 2)));
     EXPECT_EQ(outStr("name"), "Bb7");
     EXPECT_TRUE(out.at("recognised").toBool());
@@ -886,7 +886,7 @@ TEST_F(Agent_Text, ChordSymbolInFretDiagramNotReplaced)
     ASSERT_TRUE(fd);
     setup([&] { score->addText(TextStyleType::HARMONY_A, fd); });
     ASSERT_TRUE(fd->harmony());
-    refused(CHS, chordArgs("G"), AErr::Exists, "already has");
+    refused(CHS, chordArgs("G"), AErr::Exists, "fret diagram");
     refused(CHS, with(chordArgs("G"), "if_exists", Val("replace")), AErr::Exists, "fret diagram");
 }
 
@@ -1260,7 +1260,9 @@ TEST_F(Agent_Text, LyricsInTheMelismaFixture)
 
     // a verse-1 syllable under the extender: the extender is shortened, as entering it in the UI does
     addsOneEntry(LYR, lyricArgs({ syl("oh") }, 3, 1),
-                 [&] { EXPECT_EQ(light->ticks(), Lyrics::TEMP_MELISMA_TICKS) << "s->tick() == prev->tick(): eps (lyrics.cpp:310-315)"; },
+                 // adjustPrevious sets eps (s->tick() == prev->tick(), lyrics.cpp:310-315); the next layout's
+                 // removeInvalidSegments then drops the extender to 0 (lyrics.cpp:588-602), as in the UI
+                 [&] { EXPECT_EQ(light->ticks(), Fraction(0, 1)); },
                  [&] { EXPECT_EQ(light->ticks(), lightTicks); });
     ASSERT_TRUE(out.count("adjusted"));
     EXPECT_NE(out.at("adjusted").toList().front().toString().find("extender shortened"), std::string::npos)

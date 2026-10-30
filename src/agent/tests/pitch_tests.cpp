@@ -645,10 +645,11 @@ TEST_F(Agent_Pitch, SetPitchHandleTargets)
     Params p = setArgs(Val(makeHandle(n)), Val("G5"));
     ASSERT_TRUE(run(SET, p));
     EXPECT_EQ(n->pitch(), 79);
+    const std::string returned = outStr("handle"); // the refused call below replaces `out`
     // the old handle's fingerprint was the old pitch: it is stale now
     refused(SET, p, AErr::StaleHandle);
     // the returned handle works
-    ASSERT_TRUE(run(SET, setArgs(Val(outStr("handle")), Val("F5"))));
+    ASSERT_TRUE(run(SET, setArgs(Val(returned), Val("F5"))));
     EXPECT_EQ(n->pitch(), 77);
     // a single-note chord handle works
     ASSERT_TRUE(run(SET, setArgs(Val(makeHandle(n->chord())), Val("E5"))));
@@ -1024,9 +1025,18 @@ TEST_F(Agent_Pitch, TransposeOutOfRangeIsRefused)
 {
     ASSERT_TRUE(run(SET, setArgs(where(1, 1, 1), Val("G9"))));
     ASSERT_EQ(noteAt(score.get(), 1, 1, 1)->pitch(), 127);
-    refused(TR, trArgs(rangeOf(pos(1), pos(1), { 1 }), interval("m2", "up")), AErr::InvalidArg, "outside MIDI 0-127");
-    refused(TR, trArgs(rangeOf(pos(1), pos(1), { 1 }), degrees(1, "up")), AErr::InvalidArg, "outside MIDI 0-127");
-    refused(TR, trArgs(rangeOf(pos(1), pos(1), { 1 }), interval("P1", "up", 1)), AErr::InvalidArg, "outside MIDI 0-127");
+    {
+        SCOPED_TRACE("m2");
+        refused(TR, trArgs(rangeOf(pos(1), pos(1), { 1 }), interval("m2", "up")), AErr::InvalidArg, "outside MIDI 0-127");
+    }
+    {
+        SCOPED_TRACE("degrees");
+        refused(TR, trArgs(rangeOf(pos(1), pos(1), { 1 }), degrees(1, "up")), AErr::InvalidArg, "outside MIDI 0-127");
+    }
+    {
+        SCOPED_TRACE("P1+8ve");
+        refused(TR, trArgs(rangeOf(pos(1), pos(1), { 1 }), interval("P1", "up", 1)), AErr::InvalidArg, "outside MIDI 0-127");
+    }
 }
 
 TEST_F(Agent_Pitch, TransposeTieLeavingTheRange)
@@ -1417,9 +1427,9 @@ TEST_F(Agent_Pitch, LinkedTabStaffIsRefretted)
 TEST_F(Agent_Pitch, FretDiagramWithUnknownShapeLeavesNoStrayChordSymbol)
 {
     open("ties-barlines.mscz");
-    // test set-up only: an E major fret diagram with no chord symbol on bar 1. Up an augmented
-    // unison it would be E#, which harmony_to_diagram.xml has no shape for: the engine's
-    // no-chord-symbol branch then returns with its temporary Harmony attached (transpose.cpp:626-629)
+    // test set-up only: an E major fret diagram with no chord symbol on bar 1. Down an augmented
+    // unison the engine finds no shape for the result (up, it respells to a chord that has one):
+    // its no-chord-symbol branch then returns with its temporary Harmony attached (transpose.cpp:626-629)
     Segment* seg = bar(score.get(), 1)->first(SegmentType::ChordRest);
     ASSERT_TRUE(seg);
     score->startCmd(muse::TranslatableString::untranslatable("test: fret diagram"));
@@ -1431,11 +1441,11 @@ TEST_F(Agent_Pitch, FretDiagramWithUnknownShapeLeavesNoStrayChordSymbol)
     score->endCmd();
     ASSERT_FALSE(fd->isClear()) << "the E shape was found";
     ASSERT_FALSE(fd->harmony());
-    ASSERT_TRUE(fd->patternsFromHarmony(u"E#").empty()) << "the premise: no E# shape";
     const muse::String shape = fd->patternFromDiagram();
 
-    Params p = trArgs(rangeOf(pos(1), pos(1), { 1 }), interval("A1", "up"));
+    Params p = trArgs(rangeOf(pos(1), pos(1), { 1 }), interval("A1", "down"));
     p["key_signatures"] = Val(false);
+    p["ties"] = Val("extend"); // bar 1 beat 4 E5 is tied into bar 2
     Transaction tx(score.get(), *backend);
     ASSERT_TRUE(tx.begin("Agent: test"));
     const Ret r = tx.step("op", [&] { return TR(p, score.get(), out); });

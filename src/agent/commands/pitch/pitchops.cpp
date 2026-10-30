@@ -1042,6 +1042,9 @@ bool simulateDiatonic(const Note* n, int steps, bool keepAlterations, bool dbl, 
     const Fraction tick = n->chord()->segment()->tick();
     const Key key = n->staff() ? n->staff()->key(tick) : Key::C;
     const int absStep = pitch2absStepByKey(n->epitch(), n->tpc(), key, alter);
+    if (absStep + steps < MIN_STEP || absStep + steps > MAX_STEP) {
+        return false; // absStep2pitchByKey would move it an octave back in range (pitchspelling.cpp:836-841)
+    }
     int newPitch = absStep2pitchByKey(absStep + steps, key);
     int newTpc = step2tpcByKey((absStep + steps) % STEP_DELTA_OCTAVE, key);
     if (!pitchIsValid(newPitch)) {

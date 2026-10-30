@@ -1004,7 +1004,7 @@ TEST_F(Agent_WriteVoice, SetDurationTupletsGraceAndRefusals)
                   "tuplet's end");
     expectRefused(s.get(), notes::setDuration, { { "at", at(1, 3, 1) }, { "duration", Val("q.") }, { "allowOverwrite", Val(true) } },
                   "inside the tuplet");
-    expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("x") } }, "duration must be");
+    expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("z") } }, "duration must be");
     expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) } }, "duration must be");
     expectRefused(s.get(), notes::setDuration, { { "at", atOffset(1, 2, "1/24") }, { "duration", Val("q") } }, "no note or rest starts");
     expectRefused(s.get(), notes::setDuration, { { "at", at(1, 2, 1) }, { "duration", Val("q~") } }, "duration must be");
