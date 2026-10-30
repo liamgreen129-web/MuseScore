@@ -28,21 +28,6 @@
       "mcp__claude-code-remote"
     ],
     "ask": [],
-    "deny": [
-      "Bash(sudo *)",
-      "Bash(git push --force *)",
-      "Edit(//Applications/MuseScore 4.app/**)",
-      "Write(//Applications/MuseScore 4.app/**)",
-      "Edit(//Applications/MuseScore Studio 4.app/**)",
-      "Write(//Applications/MuseScore Studio 4.app/**)",
-      "Edit(//usr/local/lib/libMuseSampler*)",
-      "Write(//usr/local/lib/libMuseSampler*)",
-      "Edit(~/Library/Application Support/MuseScore/MuseScore4/**)",
-      "Write(~/Library/Application Support/MuseScore/MuseScore4/**)",
-      "Edit(~/Library/Application Support/MuseSampler/**)",
-      "Write(~/Library/Application Support/MuseSampler/**)",
-      "Edit(./tests/fixtures/real/**)",
-      "Write(./tests/fixtures/real/**)"
-    ]
+    "deny": []
   }
 }
